@@ -20,7 +20,6 @@ programming language.
    identifiers
    conf
    plugins
-   tips_and_tricks
 
 .. toctree::
    :caption: Examples 
