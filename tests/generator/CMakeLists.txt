@@ -31,16 +31,18 @@ foreach( IDS_NAME IN LISTS IDS_NAMES )
   endif()
 endforeach()
 
-find_package( SaxonHE )
+# Note: saxonche is provided by dd_build_env (set up in ALBuildDataDictionary)
+# _VENV_PYTHON points to that environment and is used for all XSLT transformations
+
 add_custom_command(
   # Use a dummy output file: when listing all actual output files,
   # they would be re-created with every build.
   OUTPUT ${GENERATED_SRC_DIR}/dummy.txt
   COMMAND 
-    java -cp ${SaxonHE_CLASSPATH}
-      net.sf.saxon.Transform -t -warnings:fatal
-      "-xsl:${CMAKE_CURRENT_SOURCE_DIR}/IDSDef2TestSuite.xsl"
-      "-s:${IDSDEF}"
+    ${_VENV_PYTHON} "${AL_LOCAL_XSLTPROC_SCRIPT}"
+      -xsl ${CMAKE_CURRENT_SOURCE_DIR}/IDSDef2TestSuite.xsl
+      -s ${IDSDEF}
+      -o ${CMAKE_CURRENT_BINARY_DIR}/test_output.xml
       newLowLevel=yes
   # Create/update our dummy file
   COMMAND ${CMAKE_COMMAND} -E touch ${GENERATED_SRC_DIR}/dummy.txt
@@ -90,7 +92,7 @@ foreach( IDS_NAME IN LISTS IDS_NAMES )
     set_tests_properties( ${TEST_NAME} PROPERTIES
       FAIL_REGULAR_EXPRESSION "[Ee][Rr][Rr][Oo][Rr]"
       # Disable coordinate consistency validation and warnings on obsolete nodes
-      ENVIRONMENT "IMAS_VERSION=${DD_VERSION};IMAS_AL_DISABLE_VALIDATE=1;IMAS_AL_DISABLE_OBSOLESCENT_WARNING=1;ids_path=${MDSPLUS_MODEL_DIR}"
+      ENVIRONMENT "IMAS_VERSION=${DD_VERSION};IMAS_AL_DISABLE_VALIDATE=1;IMAS_AL_DISABLE_OBSOLESCENT_WARNING=1;ids_path=${MDSPLUS_MODEL_DIR};MDSPLUS_MODELS_PATH=${MDSPLUS_MODEL_DIR}"
     )
 
   endif()

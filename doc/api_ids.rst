@@ -284,17 +284,18 @@ IDS API
         may have an impact on the other dynamic values. The returned IDS always has ``ids_properties.homogeneous_time = 1``.
 
         :param integer pulsectx [in]: Data entry context created with
-        :f:func:`imas_open`, :f:func:`imas_open_env` or :f:func:`imas_create_env`
+            :f:func:`imas_open`, :f:func:`imas_open_env` or :f:func:`imas_create_env`
         :param character(*) name [in]: name of the ids with optional occurrence
             number, e.g. ``"core_profiles"`` (for occurrence 0), ``"core_profiles/1"`` (for occurrence 1)
         :param IDS [out]: IDS object to put
         :param tmin [in]: Lower bound of the requested time range
-        :param tmax [in]: Upper bound of the requested time range, must be larger than or equal to :param:`tmin`
+        :param tmax [in]: Upper bound of the requested time range, must be larger than or equal to ``tmin``
         :param dtime [in]: Interval to use when interpolating, must be a real(ids_real), dimension(:)
             containing an explicit time base to interpolate.
         :param interpolMode [in]: Interpolation method to use. Available options:
 
-            - :const: CLOSEST_INTERP
-            - :const: PREVIOUS_INTERP
-            - :const: LINEAR_INTERP
+            - ``CLOSEST_INTERP``
+            - ``PREVIOUS_INTERP``
+            - ``LINEAR_INTERP``
+
         :option integer status [out]: Status code: ``0`` on success, ``<0`` on failure

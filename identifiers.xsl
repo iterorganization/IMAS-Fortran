@@ -3,17 +3,14 @@
 <?modxslt-stylesheet type="text/xsl" media="screen" alternate="no" title="Show raw source of the XML file" charset="ISO-8859-1" ?>
 
 <xsl:stylesheet 
-   xmlns:yaslt="http://www.mod-xslt2.com/ns/1.0"
-   xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"
+   xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="2.0"
    xmlns:xs="http://www.w3.org/2001/XMLSchema" 
-   xmlns:fn="http://www.w3.org/2005/02/xpath-functions"
-   xmlns:exsl="http://exslt.org/common"
-   xmlns:str="http://exslt.org/strings"
-   xmlns:func="http://exslt.org/functions"
    xmlns:my="http://localhost.localdomain/localns"
-   exclude-result-prefixes="my"
-   extension-element-prefixes="yaslt exsl func str">
-   <xsl:include href="./identifiers.common.xsl"/>
+   exclude-result-prefixes="my xs">
+   <xsl:import href="./identifiers.common.xsl"/>
+
+<xsl:param name="name"/>
+<xsl:param name="prefix"/>
    
 <xsl:output method="text" version="1.0" encoding="UTF-8" indent="yes"/>
 
@@ -22,7 +19,7 @@
 <xsl:template match="/constants">
 
   <!-- FORTRAN FILE -->
-  <exsl:document href="{$prefix}{$name}.f90" method="text">
+  <xsl:result-document href="{$prefix}{$name}.f90" method="text">
     <xsl:apply-templates select="header" mode="Fortran"/>
 
       <xsl:text>&#xA;&#xA;module al_</xsl:text><xsl:value-of select="$name"/><xsl:text>&#xA;</xsl:text>
@@ -65,12 +62,12 @@
 
 	<xsl:text>&#xA;end module al_</xsl:text><xsl:value-of select="$name"/><xsl:text>&#xA;</xsl:text>
 
-  </exsl:document>
+  </xsl:result-document>
 
   <!-- DOCBOOK FILE -->
-  <exsl:document href="{$prefix}{$name}.xml" method="text">
+  <xsl:result-document href="{$prefix}{$name}.xml" method="text">
     <xsl:call-template name="docbook"/>
-  </exsl:document>
+  </xsl:result-document>
 
 </xsl:template>
 
