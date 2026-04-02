@@ -1609,9 +1609,9 @@ subroutine validate_struct_ids_<xsl:value-of select="local:unique_name(@name)"/>
         err_msg = "the time array must be associated"
         status = -1 
         return
+  else if (associated(ids%time)) then
+    ids_time_size = size(ids%time)
   end if
-
-  ids_time_size = size(ids%time)
   </xsl:if>
   
   
