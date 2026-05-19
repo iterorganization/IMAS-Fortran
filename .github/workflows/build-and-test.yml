@@ -376,7 +376,7 @@ jobs:
     
     - name: Upload build artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: build-artifacts-${{ matrix.name }}
         path: |
@@ -388,7 +388,7 @@ jobs:
     
     - name: Upload installation
       if: success()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: installation-${{ matrix.name }}
         path: install/
@@ -483,7 +483,7 @@ jobs:
     
     - name: Upload documentation
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: documentation
         path: doc/_build/html/
