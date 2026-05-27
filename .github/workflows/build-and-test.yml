@@ -536,7 +536,7 @@ jobs:
         echo "version=${TAG_NAME#v}" >> $GITHUB_OUTPUT
     
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       with:
         name: Release ${{ steps.version.outputs.tag }}
         draft: false
