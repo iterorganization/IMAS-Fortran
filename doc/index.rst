@@ -14,6 +14,7 @@ programming language.
    getting_started
    imas
    using_al
+   error_handling
    load_store_ids
    use_ids
    imas_uri
