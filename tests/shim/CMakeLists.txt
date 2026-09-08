@@ -241,6 +241,7 @@ set_tests_properties(al-fortran-test-shim-refusal-rules PROPERTIES
 # not share a pulse directory.
 add_executable(al-fortran-test-shim-roundtrip test_shim_roundtrip.f90)
 target_link_libraries(al-fortran-test-shim-roundtrip PRIVATE al-fortran)
+al_shim_private_module_dir(al-fortran-test-shim-roundtrip)
 
 function(add_shim_roundtrip_test name fixture read_control)
   set(copy_test "al-fortran-test-shim-${name}-fixture")
