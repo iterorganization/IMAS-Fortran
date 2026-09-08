@@ -310,9 +310,10 @@ function(add_shim_roundtrip_test name fixture read_control)
   add_test(NAME ${test_name}
     COMMAND al-fortran-test-shim-roundtrip ${fixture_copy} ${read_control}
   )
+  al_shim_private_loss_log(${test_name} loss_log_dir)
   set_tests_properties(${test_name} PROPERTIES
-    FIXTURES_REQUIRED ${test_name}
-    ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
+    FIXTURES_REQUIRED "${test_name};${test_name}-loss-log"
+    ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${loss_log_dir};${AL_CORE_TEST_ENVIRONMENT}"
     LABELS "shim;contract-assertion"
     FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
   )
@@ -347,9 +348,10 @@ add_test(NAME al-fortran-test-shim-torn-write
     -D "SCENARIO=al-fortran-test-shim-torn-write"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_torn_write.cmake"
 )
+al_shim_private_loss_log(al-fortran-test-shim-torn-write AL_SHIM_TORN_WRITE_LOSS_LOG_DIR)
 set_tests_properties(al-fortran-test-shim-torn-write PROPERTIES
-  FIXTURES_REQUIRED al-fortran-test-shim-torn-write
-  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
+  FIXTURES_REQUIRED "al-fortran-test-shim-torn-write;al-fortran-test-shim-torn-write-loss-log"
+  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_TORN_WRITE_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;behaviour-pin"
   FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
@@ -377,9 +379,10 @@ add_test(NAME al-fortran-test-shim-full-put-stamp
     -D "SCENARIO=al-fortran-test-shim-full-put-stamp"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_full_put_stamp.cmake"
 )
+al_shim_private_loss_log(al-fortran-test-shim-full-put-stamp AL_SHIM_FULL_PUT_STAMP_LOSS_LOG_DIR)
 set_tests_properties(al-fortran-test-shim-full-put-stamp PROPERTIES
-  FIXTURES_REQUIRED al-fortran-test-shim-full-put-stamp
-  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
+  FIXTURES_REQUIRED "al-fortran-test-shim-full-put-stamp;al-fortran-test-shim-full-put-stamp-loss-log"
+  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_FULL_PUT_STAMP_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
   FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
