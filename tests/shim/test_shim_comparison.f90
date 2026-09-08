@@ -1,6 +1,6 @@
 ! Synthetic truth table for the comparison oracle used by the shim contract
 ! suite.  A pulse can never prove its own comparator right, so every verdict is
-! driven here from literals with an independently stated expected result.
+! driven here from literals with an independently stated expected verdict.
 program test_shim_comparison
   use ids_routines, only: ids_real, ids_int, ids_int_invalid
   use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence, color_for_verdict

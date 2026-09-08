@@ -163,7 +163,7 @@ contains
   ! `eq_cross%...%j_phi` an unassociated pointer, not an allocated
   ! zero-length array, so indexing element 1 unconditionally segfaults the
   ! whole suite before any rule gets to report anything -- worse than a red
-  ! test, since it hides every other rule's result too. This mirrors the
+  ! test, since it hides every other rule's verdict too. This mirrors the
   ! fold-axis-bphi candidate-fallback
   ! defect shim_rule_table.f90 already documents for the structural rules,
   ! just refusing outright here instead of returning a wrong not-found

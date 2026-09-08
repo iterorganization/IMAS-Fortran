@@ -23,7 +23,7 @@
 ! when it fails: a structural rule the shim served nothing for prints `only3`,
 ! "a value on the DD 3 side only", for a reading where the value is in fact on
 ! the DD 4 side. That is a legibility defect in a failure message rather than
-! a wrong result, and it belongs to that test rather than this one.
+! a wrong verdict, and it belongs to that test rather than this one.
 !
 ! This is also why the loss log file is a second channel rather than the only
 ! one: a value comparison on its own distinguishes a served field from a
