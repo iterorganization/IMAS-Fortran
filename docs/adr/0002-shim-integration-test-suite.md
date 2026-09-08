@@ -26,9 +26,9 @@ It has four deliberate boundaries:
   `new-constraints-j-parallel` on three of thirteen. A `right_only` rule is
   served or it is not, and the sampled leaves are enough to say which, so this
   is the intended consequence of organising by rule rather than by leaf — but
-  a shim serving *part* of such a subtree would not be caught. Three `merged`
-  folds in the map (`fold-constraints-j`, `fold-ggd-j`, `fold-ggd-bfield`)
-  are claimed by no rule-table ticket at all and are asserted nowhere.
+  a shim serving *part* of such a subtree would not be caught. The three
+  alias-only `merged` folds (`fold-constraints-j`, `fold-ggd-j`,
+  `fold-ggd-bfield`) are likewise asserted on one populated child each.
 - **Tier 1 only.** Tests use `ids_get` and `ids_put`, never the shim C ABI.
   C-ABI tests belong in the shim repository. `ids_get` owns and ends its action
   context, so Tier 1 cannot call `imas_mvdd_context_loss_*`; it reads the shim's
@@ -65,7 +65,8 @@ This ADR records the reconciliation; it does not close it.
 
 - The suite is expected to have known contract-assertion failures on arrival,
   including the `chi_squared_{r,z}` paths under `x_point` and `strike_point`.
-  The later suite README will record the current red list and its causes.
+  The [suite README](../../tests/shim/README.md) records the current red list
+  and its causes.
 - Shim mode is not in CI. Adding it to CI requires revisiting this ADR first.
 - Tests are organized by conversion rule rather than by leaf: a rule is the
   unit that can be right or wrong, and its fidelity declaration is the oracle.

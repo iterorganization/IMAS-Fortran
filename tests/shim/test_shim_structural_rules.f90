@@ -13,9 +13,11 @@
 ! issue #63's acceptance criteria for this ticket).
 program test_shim_structural_rules
   use ids_routines, only: ids_equilibrium, ids_real
+  use ids_schemas_equilibrium, only: ids_equilibrium_constraints_0D_position
+  use ids_utilities, only: ids_generic_grid_scalar
   use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
                                read_same_version, assert_reads_usable
-  use shim_comparison, only: verdict_real, verdict_real_vector_as_read, verdict_real_matrix_as_read
+  use shim_comparison, only: verdict_real, verdict_real_vector_as_read, verdict_real_matrix_as_read, presence_verdict
   use shim_comparison, only: verdict_len
   use shim_rule_table, only: structural_rules
   use shim_rule_check, only: rule_checker
@@ -80,7 +82,7 @@ program test_shim_structural_rules
                 verdict_real(eq_cross%time_slice(1)%boundary%gap(1)%z, &
                               eq_control%time_slice(1)%boundary%gap(1)%z)))
 
-  ! -- merged: the eight folds --
+  ! -- merged folds --
   call checker%check('fold-p2d-br', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_r, &
                                              eq_control%time_slice(1)%profiles_2d(1)%b_field_r))
   call checker%check('fold-p2d-bz', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_z, &
@@ -102,6 +104,15 @@ program test_shim_structural_rules
   call checker%check('fold-energy-mhd', &
        verdict_real(eq_cross%time_slice(1)%global_quantities%energy_mhd, &
                     eq_control%time_slice(1)%global_quantities%energy_mhd))
+  call checker%check('fold-constraints-j', &
+       position_measured_verdict(eq_cross%time_slice(1)%constraints%j_phi, &
+                                 eq_control%time_slice(1)%constraints%j_phi))
+  call checker%check('fold-ggd-j', &
+       ggd_values_verdict(eq_cross%time_slice(1)%ggd(1)%j_phi, &
+                          eq_control%time_slice(1)%ggd(1)%j_phi))
+  call checker%check('fold-ggd-bfield', &
+       ggd_values_verdict(eq_cross%time_slice(1)%ggd(1)%b_field_phi, &
+                          eq_control%time_slice(1)%ggd(1)%b_field_phi))
 
   ! -- split: one DD3 source feeds two DD4 targets; both must agree --
   call checker%check('split-psi-axis', &
@@ -119,6 +130,40 @@ program test_shim_structural_rules
   end if
 
 contains
+
+  ! A refused merged AOS is left unassociated by the generated reader. Judge
+  ! its presence before sampling a child so the checker can name the rule.
+  function position_measured_verdict(cross, control) result(verdict)
+    type(ids_equilibrium_constraints_0D_position), pointer, intent(in) :: cross(:), control(:)
+    character(len=verdict_len) :: verdict
+    logical :: has_cross, has_control
+
+    has_cross = associated(cross)
+    if (has_cross) has_cross = size(cross) >= 1
+    has_control = associated(control)
+    if (has_control) has_control = size(control) >= 1
+
+    verdict = presence_verdict(has_cross, has_control)
+    if (verdict /= '') return
+    verdict = verdict_real(cross(1)%measured, control(1)%measured)
+  end function position_measured_verdict
+
+  ! These folds map an AOS of generic-grid scalars. One populated values
+  ! vector proves that the rule translated and served its target.
+  function ggd_values_verdict(cross, control) result(verdict)
+    type(ids_generic_grid_scalar), pointer, intent(in) :: cross(:), control(:)
+    character(len=verdict_len) :: verdict
+    logical :: has_cross, has_control
+
+    has_cross = associated(cross)
+    if (has_cross) has_cross = size(cross) >= 1
+    has_control = associated(control)
+    if (has_control) has_control = size(control) >= 1
+
+    verdict = presence_verdict(has_cross, has_control)
+    if (verdict /= '') return
+    verdict = verdict_real_vector_as_read(cross(1)%values, control(1)%values)
+  end function ggd_values_verdict
 
   ! One rule can combine several leaf verdicts (e.g. an r/z pair); the rule
   ! fails if either does, and the first non-agreeing verdict is reported.
