@@ -101,6 +101,7 @@
 ! here and (per the note above) an obsolescent-alias fold not otherwise
 ! claimed by the structural table.
 module shim_rule_table
+  use shim_comparison, only: verdict_len, VERDICT_SAME, VERDICT_ONLY4
   implicit none
   private
 
@@ -521,17 +522,17 @@ contains
   ! that order; the reverse order would report `only3` for the same reading.
   function expected_verdict_for_kind(kind) result(verdict)
     integer, intent(in) :: kind
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
 
     select case (kind)
     case (rule_kind_identical, rule_kind_renamed, rule_kind_moved, rule_kind_merged, rule_kind_split, rule_kind_cocos)
-      verdict = 'same'
+      verdict = VERDICT_SAME
     case (rule_kind_right_only)
       ! Same shape as the retyped case below and for a different reason: not
       ! a refusal, but a path with no DD 3 source to serve from at all.  The
       ! skip log therefore does not name these, so unlike a retyped refusal
       ! the verdict is the whole assertion.
-      verdict = 'only4'
+      verdict = VERDICT_ONLY4
     case (rule_kind_retyped)
       ! What a refusal looks like through the comparison primitives: the
       ! DD 4.1.1 control read holds the value and the shim's cross-version
@@ -542,12 +543,24 @@ contains
       ! The verdict is half the assertion.  A field can also be absent
       ! because the pulse never held it, so the refusal test pairs this
       ! 'only4' with a named entry in the read-side skip log.
-      verdict = 'only4'
+      verdict = VERDICT_ONLY4
     case (rule_kind_redefined)
       ! Red by design: the shim refuses these today, so the observed verdict
       ! is 'only4' and this expectation fails until the shim serves them.
       ! Stated as the contract has it, not as the shim behaves.
-      verdict = 'same'
+      !
+      ! Two tickets ask for opposite things here and this line follows one of
+      ! them deliberately. Issue #70 AC6 (and issue #63 US38) say "a quantity
+      ! whose unit the map records as redefined is asserted refused rather
+      ! than served", which would make this 'only4'. Issue #63's own rule
+      ! table and issue #72 say the four chi_squared paths must be asserted
+      ! as served, which makes it 'same'. The rule table wins: 'refused' is
+      ! what the shim does, and ADR 0002 says an assertion states the
+      ! contract rather than today's behaviour, so writing 'only4' here would
+      ! be exactly the weakening that ADR forbids -- the four reds would go
+      ! green while the defect stayed. #70 AC6 and #63 US38 need withdrawing
+      ! in the tracker.
+      verdict = VERDICT_SAME
     case default
       error stop 'shim_rule_table: unhandled rule kind'
     end select

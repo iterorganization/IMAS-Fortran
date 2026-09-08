@@ -14,39 +14,32 @@
 ! This is the assertion issue #63 calls the whole suite's reason to exist: a
 ! quantity whose required sign flip stopped being applied must fail, and fail
 ! under the verdict that names that specific failure. shim_comparison's
-! verdict_real / verdict_real_vector already distinguish it: two values equal
+! verdict_real / verdict_real_vector_with_stated_presence already distinguish it: two values equal
 ! in magnitude but opposite in sign report 'NOFLIP', not the generic 'DIFF' a
 ! reader could skim past, and NOFLIP carries mismatch severity, not warning
 ! severity (see shim_comparison's color_for_verdict and its unit test). This
 ! program supplies no comparison logic of its own; per-rule kind and verdict
 ! come entirely from shim_rule_table, per the suite's stated-once design.
 program test_shim_cocos_rules
-  use ids_routines, only: ids_equilibrium, OPEN_PULSE, imas_open, imas_close, ids_get, ids_real
-  use al_get_policy, only: PARTIAL_READ
+  use ids_routines, only: ids_equilibrium, ids_real
+  use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
+                               read_same_version, assert_reads_usable
   use ids_schemas_equilibrium, only: ids_equilibrium_constraints_0D_position
-  use shim_comparison, only: verdict_real, verdict_real_vector_by_size, verdict_real_matrix_by_size
+  use shim_comparison, only: verdict_real, verdict_real_vector_as_read, verdict_real_matrix_as_read
+  use shim_comparison, only: verdict_len, VERDICT_NOFLIP, presence_verdict
   use shim_rule_table, only: cocos_rules
   use shim_rule_check, only: rule_checker
   implicit none
 
   type(ids_equilibrium) :: eq_cross, eq_control
   character(len=512) :: fixture_root
-  integer :: context, status_cross, status_control
+  integer :: status_cross, status_control
   type(rule_checker) :: checker
 
-  call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-3.39.0', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_cross, status_cross)
-  call imas_close(context)
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-4.1.1', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_control, status_control)
-  call imas_close(context)
-
-  if (status_control /= 0) error stop 'same-version control read did not succeed cleanly'
-  if (status_cross /= 0 .and. status_cross /= PARTIAL_READ) error stop 'cross-version read failed outright'
+  fixture_root = fixture_root_from_command()
+  call read_cross_version(fixture_root, eq_cross, status_cross)
+  call read_same_version(fixture_root, eq_control, status_control)
+  call assert_reads_usable(status_cross, status_control)
 
   checker%rules = cocos_rules
   checker%marker = 'COCOS-FAILURE'
@@ -93,7 +86,7 @@ program test_shim_cocos_rules
                              eq_control%time_slice(1)%constraints%q))
 
   call check('cocos-ggd-psi-values', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%ggd(1)%psi(1)%values, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%ggd(1)%psi(1)%values, &
                                    eq_control%time_slice(1)%ggd(1)%psi(1)%values))
 
   call check('cocos-gq-ip', &
@@ -116,38 +109,38 @@ program test_shim_cocos_rules
                     eq_control%time_slice(1)%global_quantities%v_external))
 
   call check('cocos-p1d-darea-dpsi', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%darea_dpsi, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%darea_dpsi, &
                                    eq_control%time_slice(1)%profiles_1d%darea_dpsi))
   call check('cocos-p1d-dpressure-dpsi', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%dpressure_dpsi, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%dpressure_dpsi, &
                                    eq_control%time_slice(1)%profiles_1d%dpressure_dpsi))
   call check('cocos-p1d-dpsi-drho-tor', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%dpsi_drho_tor, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%dpsi_drho_tor, &
                                    eq_control%time_slice(1)%profiles_1d%dpsi_drho_tor))
   call check('cocos-p1d-dvolume-dpsi', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%dvolume_dpsi, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%dvolume_dpsi, &
                                    eq_control%time_slice(1)%profiles_1d%dvolume_dpsi))
   call check('cocos-p1d-f-df-dpsi', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%f_df_dpsi, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%f_df_dpsi, &
                                    eq_control%time_slice(1)%profiles_1d%f_df_dpsi))
   call check('cocos-p1d-j-parallel', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%j_parallel, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%j_parallel, &
                                    eq_control%time_slice(1)%profiles_1d%j_parallel))
   call check('cocos-p1d-j-phi', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%j_phi, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%j_phi, &
                                    eq_control%time_slice(1)%profiles_1d%j_phi))
   call check('cocos-p1d-psi', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%psi, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%psi, &
                                    eq_control%time_slice(1)%profiles_1d%psi))
 
   call check('cocos-p2d-j-parallel', &
-       verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%j_parallel, &
+       verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%j_parallel, &
                         eq_control%time_slice(1)%profiles_2d(1)%j_parallel))
   call check('cocos-p2d-j-phi', &
-       verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%j_phi, &
+       verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%j_phi, &
                         eq_control%time_slice(1)%profiles_2d(1)%j_phi))
   call check('cocos-p2d-psi', &
-       verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%psi, &
+       verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%psi, &
                         eq_control%time_slice(1)%profiles_2d(1)%psi))
 
   call checker%assert_every_rule_checked(checker%expectations)
@@ -187,22 +180,18 @@ contains
   ! size() alone gating the element access.
   function position_psi_verdict(cross, control) result(verdict)
     type(ids_equilibrium_constraints_0D_position), pointer, intent(in) :: cross(:), control(:)
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
     logical :: has_left, has_right
 
     has_left = associated(cross)
     if (has_left) has_left = size(cross) >= 1
     has_right = associated(control)
     if (has_right) has_right = size(control) >= 1
-    if (.not. has_left .and. .not. has_right) then
-      verdict = '--'
-    else if (.not. has_right) then
-      verdict = 'only4'
-    else if (.not. has_left) then
-      verdict = 'only3'
-    else
-      verdict = verdict_real(cross(1)%position%psi, control(1)%position%psi)
-    end if
+
+    verdict = presence_verdict(has_left, has_right)
+    if (verdict /= '') return
+
+    verdict = verdict_real(cross(1)%position%psi, control(1)%position%psi)
   end function position_psi_verdict
 
 
@@ -213,9 +202,9 @@ contains
   ! in the shared checker.
   subroutine check(id, verdict)
     character(len=*), intent(in) :: id
-    character(len=6), intent(in) :: verdict
+    character(len=verdict_len), intent(in) :: verdict
 
-    if (trim(verdict) == 'NOFLIP') then
+    if (trim(verdict) == trim(VERDICT_NOFLIP)) then
       call checker%check(id, verdict, 'the required COCOS sign flip did not happen')
     else
       call checker%check(id, verdict)

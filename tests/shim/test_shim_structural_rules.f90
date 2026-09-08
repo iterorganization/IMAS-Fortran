@@ -12,31 +12,24 @@
 ! source), not only the field, per the suite's design (docs/adr/0002 and
 ! issue #63's acceptance criteria for this ticket).
 program test_shim_structural_rules
-  use ids_routines, only: ids_equilibrium, OPEN_PULSE, imas_open, imas_close, ids_get, ids_real
-  use al_get_policy, only: PARTIAL_READ
-  use shim_comparison, only: verdict_real, verdict_real_vector_by_size, verdict_real_matrix_by_size
+  use ids_routines, only: ids_equilibrium, ids_real
+  use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
+                               read_same_version, assert_reads_usable
+  use shim_comparison, only: verdict_real, verdict_real_vector_as_read, verdict_real_matrix_as_read
+  use shim_comparison, only: verdict_len
   use shim_rule_table, only: structural_rules
   use shim_rule_check, only: rule_checker
   implicit none
 
   type(ids_equilibrium) :: eq_cross, eq_control
   character(len=512) :: fixture_root
-  integer :: context, status_cross, status_control
+  integer :: status_cross, status_control
   type(rule_checker) :: checker
 
-  call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-3.39.0', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_cross, status_cross)
-  call imas_close(context)
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-4.1.1', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_control, status_control)
-  call imas_close(context)
-
-  if (status_control /= 0) error stop 'same-version control read did not succeed cleanly'
-  if (status_cross /= 0 .and. status_cross /= PARTIAL_READ) error stop 'cross-version read failed outright'
+  fixture_root = fixture_root_from_command()
+  call read_cross_version(fixture_root, eq_cross, status_cross)
+  call read_same_version(fixture_root, eq_control, status_control)
+  call assert_reads_usable(status_cross, status_control)
 
   checker%rules = structural_rules
   checker%marker = 'STRUCTURAL-FAILURE'
@@ -45,7 +38,7 @@ program test_shim_structural_rules
   call checker%check('identical-vacuum-r0', &
        verdict_real(eq_cross%vacuum_toroidal_field%r0, eq_control%vacuum_toroidal_field%r0))
   call checker%check('identical-time', &
-       verdict_real_vector_by_size(eq_cross%time, eq_control%time))
+       verdict_real_vector_as_read(eq_cross%time, eq_control%time))
   call checker%check('identical-beta-pol', &
        verdict_real(eq_cross%time_slice(1)%global_quantities%beta_pol, &
                     eq_control%time_slice(1)%global_quantities%beta_pol))
@@ -88,23 +81,23 @@ program test_shim_structural_rules
                               eq_control%time_slice(1)%boundary%gap(1)%z)))
 
   ! -- merged: the eight folds --
-  call checker%check('fold-p2d-br', verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%b_field_r, &
+  call checker%check('fold-p2d-br', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_r, &
                                              eq_control%time_slice(1)%profiles_2d(1)%b_field_r))
-  call checker%check('fold-p2d-bz', verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%b_field_z, &
+  call checker%check('fold-p2d-bz', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_z, &
                                              eq_control%time_slice(1)%profiles_2d(1)%b_field_z))
-  call checker%check('fold-p2d-bphi', verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%b_field_phi, &
+  call checker%check('fold-p2d-bphi', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_phi, &
                                                eq_control%time_slice(1)%profiles_2d(1)%b_field_phi))
   call checker%check('fold-axis-bphi', &
        verdict_real(eq_cross%time_slice(1)%global_quantities%magnetic_axis%b_field_phi, &
                     eq_control%time_slice(1)%global_quantities%magnetic_axis%b_field_phi))
   call checker%check('fold-p1d-baverage', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%b_field_average, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_average, &
                                    eq_control%time_slice(1)%profiles_1d%b_field_average))
   call checker%check('fold-p1d-bmax', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%b_field_max, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_max, &
                                    eq_control%time_slice(1)%profiles_1d%b_field_max))
   call checker%check('fold-p1d-bmin', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%b_field_min, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_min, &
                                    eq_control%time_slice(1)%profiles_1d%b_field_min))
   call checker%check('fold-energy-mhd', &
        verdict_real(eq_cross%time_slice(1)%global_quantities%energy_mhd, &
@@ -138,8 +131,8 @@ contains
   ! else.  test_shim_right_only_rules derives it for the same reason.
   function combine_pair(id, first, second) result(combined)
     character(len=*), intent(in) :: id
-    character(len=6), intent(in) :: first, second
-    character(len=6) :: combined, expected
+    character(len=verdict_len), intent(in) :: first, second
+    character(len=verdict_len) :: combined, expected
 
     expected = checker%expected_for(id)
     if (trim(first) /= trim(expected)) then

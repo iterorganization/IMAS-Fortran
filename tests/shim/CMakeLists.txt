@@ -1,11 +1,17 @@
-# Linkage test for the multiversion shim
+# The shim integration test suite (issue #63)
 #
-# Registered only in a shim build: with AL_USE_MULTIVERSION_SHIM off there is
-# nothing to assert and the test list stays exactly what it was.
+# The linkage test below, then the contract assertions and behaviour pins that
+# check the shim's conversion rule by rule: the comparison oracle, fixture
+# provenance, the structural, COCOS, right_only and refusal rule tables, the
+# loss log file, the write-side scenarios, and the passthrough scenarios.
+#
+# The whole file is registered only in a shim build: with
+# AL_USE_MULTIVERSION_SHIM off there is nothing to assert and the test list
+# stays exactly what it was.
 
 if( WIN32 )
   # The shim resolves AL core through dlopen/dlsym, so a shim build is POSIX-only.
-  message( STATUS "Not registering al-fortran-test-shim-linkage: not supported on Windows" )
+  message( STATUS "Not registering the shim test suite: not supported on Windows" )
   return()
 endif()
 
@@ -24,7 +30,9 @@ else()
 endif()
 
 if( NOT AL_SHIM_INSPECT_TOOL )
-  message( STATUS "Not registering al-fortran-test-shim-linkage: no dependency inspection tool found" )
+  # This return() skips the whole suite, not only the linkage test, because
+  # every test below is registered after it.
+  message( STATUS "Not registering the shim test suite: no dependency inspection tool found" )
   return()
 endif()
 
@@ -50,11 +58,39 @@ function( al_shim_private_module_dir target )
   )
 endfunction()
 
+# Give one test a private, empty loss-log directory (issue #71: "each test
+# points the loss-log directory at its own location under the build tree,
+# cleaned before the run").
+#
+# Leaving IMAS_MVDD_LOSS_LOG_DIR unset is not neutral: docs/
+# SHIM_INTEGRATION_CONTRACT.md section 7 says the shim then writes into the
+# current working directory, which for a ctest run is the build tree, where
+# the file is left for whichever test globs there next.  So every test whose
+# read can be non-exact gets a directory, whether or not it asserts on it.
+#
+# The cleaning is a CTest fixture rather than a configure-time file(REMOVE)
+# because configure runs once and ctest runs many times.  Sets
+# <out_var> to the directory in the caller's scope.
+function( al_shim_private_loss_log test_name out_var )
+  set( _dir "${CMAKE_CURRENT_BINARY_DIR}/${test_name}-loss-log" )
+  add_test( NAME ${test_name}-loss-log-clean
+    COMMAND ${CMAKE_COMMAND}
+      -D "LOSS_LOG_DIR=${_dir}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/clean_loss_log_dir.cmake"
+  )
+  set_tests_properties( ${test_name}-loss-log-clean PROPERTIES
+    FIXTURES_SETUP ${test_name}-loss-log
+    LABELS "shim"
+  )
+  set( ${out_var} "${_dir}" PARENT_SCOPE )
+endfunction()
+
 # The comparison oracle is tested before any pulse-based contract assertion uses
 # it.  It is deliberately self-contained in this registered suite rather than
 # sharing the playground's diagnostic-only table code.
 add_executable( al-fortran-test-shim-comparison
   shim_comparison.f90
+  shim_run_guard.f90
   test_shim_comparison.f90
 )
 target_link_libraries( al-fortran-test-shim-comparison PRIVATE al-fortran )
@@ -114,11 +150,13 @@ add_test(NAME al-fortran-test-shim-nested-loss
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-nested-loss>;${AL_SHIM_FIXTURE_ROOT}"
     -D "LOSS_LOG_DIR=${AL_SHIM_NESTED_LOSS_LOG_DIR}"
     -D "FIXTURE_ROOT=${AL_SHIM_FIXTURE_ROOT}"
+    -D "SCENARIO=al-fortran-test-shim-nested-loss"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_nested_loss_log.cmake"
 )
 set_tests_properties(al-fortran-test-shim-nested-loss PROPERTIES
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_NESTED_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 # Structural rules (identical, renamed, moved, merged, split): each asserted
@@ -128,6 +166,8 @@ set_tests_properties(al-fortran-test-shim-nested-loss PROPERTIES
 # and its citations.
 add_executable(al-fortran-test-shim-structural-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
+  shim_run_guard.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_structural_rules.f90
@@ -137,8 +177,12 @@ al_shim_private_module_dir(al-fortran-test-shim-structural-rules)
 add_test(NAME al-fortran-test-shim-structural-rules
   COMMAND al-fortran-test-shim-structural-rules "${AL_SHIM_FIXTURE_ROOT}"
 )
+# This read converts, so it can record loss; it asserts nothing about the loss
+# log file, but it must not drop one in the ctest working directory.
+al_shim_private_loss_log(al-fortran-test-shim-structural-rules AL_SHIM_STRUCTURAL_LOSS_LOG_DIR)
 set_tests_properties(al-fortran-test-shim-structural-rules PROPERTIES
-  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
+  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_STRUCTURAL_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
+  FIXTURES_REQUIRED al-fortran-test-shim-structural-rules-loss-log
   LABELS "shim;contract-assertion"
   FAIL_REGULAR_EXPRESSION "STRUCTURAL-FAILURE"
 )
@@ -152,6 +196,8 @@ set_tests_properties(al-fortran-test-shim-structural-rules PROPERTIES
 # entries rather than the 32 commonly quoted elsewhere.
 add_executable(al-fortran-test-shim-cocos-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
+  shim_run_guard.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_cocos_rules.f90
@@ -161,8 +207,10 @@ al_shim_private_module_dir(al-fortran-test-shim-cocos-rules)
 add_test(NAME al-fortran-test-shim-cocos-rules
   COMMAND al-fortran-test-shim-cocos-rules "${AL_SHIM_FIXTURE_ROOT}"
 )
+al_shim_private_loss_log(al-fortran-test-shim-cocos-rules AL_SHIM_COCOS_LOSS_LOG_DIR)
 set_tests_properties(al-fortran-test-shim-cocos-rules PROPERTIES
-  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
+  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_COCOS_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
+  FIXTURES_REQUIRED al-fortran-test-shim-cocos-rules-loss-log
   LABELS "shim;contract-assertion"
   FAIL_REGULAR_EXPRESSION "COCOS-FAILURE"
 )
@@ -175,6 +223,8 @@ set_tests_properties(al-fortran-test-shim-cocos-rules PROPERTIES
 # why at length.
 add_executable(al-fortran-test-shim-right-only-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
+  shim_run_guard.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_right_only_rules.f90
@@ -188,14 +238,13 @@ add_test(NAME al-fortran-test-shim-right-only-rules
 # docs/SHIM_INTEGRATION_CONTRACT.md section 7 says such a run writes a loss
 # file into IMAS_MVDD_LOSS_LOG_DIR -- or into the working directory when that
 # is unset, which would drop it in the build tree and leave it for whichever
-# test looks there next. This test asserts nothing about the loss log; it
-# points it somewhere private purely so it cannot be mistaken for another
-# test's artifact. The directory has to exist before the run, hence
-# file(MAKE_DIRECTORY) at configure time.
-set(AL_SHIM_RIGHT_ONLY_LOSS_LOG_DIR "${CMAKE_CURRENT_BINARY_DIR}/right-only-loss-log")
-file(MAKE_DIRECTORY "${AL_SHIM_RIGHT_ONLY_LOSS_LOG_DIR}")
+# test looks there next. This test asserts nothing about the loss log file;
+# it points it somewhere private purely so it cannot be mistaken for another
+# test's artifact.
+al_shim_private_loss_log(al-fortran-test-shim-right-only-rules AL_SHIM_RIGHT_ONLY_LOSS_LOG_DIR)
 set_tests_properties(al-fortran-test-shim-right-only-rules PROPERTIES
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_RIGHT_ONLY_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
+  FIXTURES_REQUIRED al-fortran-test-shim-right-only-rules-loss-log
   LABELS "shim;contract-assertion"
   FAIL_REGULAR_EXPRESSION "RIGHT-ONLY-FAILURE"
 )
@@ -209,16 +258,17 @@ set_tests_properties(al-fortran-test-shim-right-only-rules PROPERTIES
 # This test asserts the Fortran-side skip log, which is a different channel
 # from the shim's loss log file, but it still needs its own loss-log
 # directory: leaving IMAS_MVDD_LOSS_LOG_DIR unset is not neutral, because the
-# shim then writes the loss log into the current working directory.  Giving
+# shim then writes the loss log file into the current working directory.  Giving
 # it a directory of its own -- rather than the empty value the shim reads as
 # "disable" -- keeps the suite parallel-safe and leaves the channel there for
-# a later test to assert.  It is not cleaned before the run because nothing
-# here reads it; the test that does own that (al-fortran-test-shim-nested-loss)
-# cleans its own through a CMake wrapper.
-set(AL_SHIM_REFUSAL_LOSS_LOG_DIR "${CMAKE_CURRENT_BINARY_DIR}/refusal-loss-log")
-file(MAKE_DIRECTORY "${AL_SHIM_REFUSAL_LOSS_LOG_DIR}")
+# a later test to assert.  It is emptied before each run even though nothing
+# here reads it, so a repeated ctest run does not accumulate files in the
+# build tree.
+al_shim_private_loss_log(al-fortran-test-shim-refusal-rules AL_SHIM_REFUSAL_LOSS_LOG_DIR)
 add_executable(al-fortran-test-shim-refusal-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
+  shim_run_guard.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_refusal_rules.f90
@@ -233,6 +283,7 @@ add_test(NAME al-fortran-test-shim-refusal-rules
 # word "error".
 set_tests_properties(al-fortran-test-shim-refusal-rules PROPERTIES
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_REFUSAL_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
+  FIXTURES_REQUIRED al-fortran-test-shim-refusal-rules-loss-log
   LABELS "shim;contract-assertion"
   FAIL_REGULAR_EXPRESSION "REFUSAL-FAILURE"
 )
@@ -241,6 +292,7 @@ set_tests_properties(al-fortran-test-shim-refusal-rules PROPERTIES
 # not share a pulse directory.
 add_executable(al-fortran-test-shim-roundtrip test_shim_roundtrip.f90)
 target_link_libraries(al-fortran-test-shim-roundtrip PRIVATE al-fortran)
+al_shim_private_module_dir(al-fortran-test-shim-roundtrip)
 
 function(add_shim_roundtrip_test name fixture read_control)
   set(copy_test "al-fortran-test-shim-${name}-fixture")
@@ -262,6 +314,7 @@ function(add_shim_roundtrip_test name fixture read_control)
     FIXTURES_REQUIRED ${test_name}
     ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
     LABELS "shim;contract-assertion"
+    FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
   )
 endfunction()
 
@@ -291,12 +344,14 @@ add_test(NAME al-fortran-test-shim-torn-write
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-torn-write>;${AL_SHIM_TORN_WRITE_FIXTURE}"
     -D "EXPECTED_REFUSED_PATH=global_quantities/rho_tor_boundary"
+    -D "SCENARIO=al-fortran-test-shim-torn-write"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_torn_write.cmake"
 )
 set_tests_properties(al-fortran-test-shim-torn-write PROPERTIES
   FIXTURES_REQUIRED al-fortran-test-shim-torn-write
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;behaviour-pin"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 # Unlike ids_put_slice, a full put visits the DD-version stamp.  Run this
@@ -319,12 +374,14 @@ add_test(NAME al-fortran-test-shim-full-put-stamp
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-full-put-stamp>;${CMAKE_CURRENT_BINARY_DIR}/full-put-stamp-fixture"
     -D "EXPECTED_OUTPUT=REFUSED WRITE: 'ids_properties/version_put/data_dictionary'"
+    -D "SCENARIO=al-fortran-test-shim-full-put-stamp"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_full_put_stamp.cmake"
 )
 set_tests_properties(al-fortran-test-shim-full-put-stamp PROPERTIES
   FIXTURES_REQUIRED al-fortran-test-shim-full-put-stamp
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 # A stamp is read while opening an occurrence, so these three states have to
@@ -393,6 +450,7 @@ else()
         COMMAND ${CMAKE_COMMAND}
           -D "COMMAND_TO_RUN=$<TARGET_FILE:${target}>;${fixture}"
           -D "LOSS_LOG_DIR=${loss_log_dir}"
+          -D "SCENARIO=${target}"
           -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
       )
       set(environment
@@ -405,6 +463,7 @@ else()
     set_tests_properties(${target} PROPERTIES
       ENVIRONMENT "${environment}"
       LABELS "shim;contract-assertion"
+      FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
     )
   endfunction()
 
@@ -441,6 +500,7 @@ add_test(NAME al-fortran-test-shim-version-unset
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-version-unset>;${AL_SHIM_FIXTURE_ROOT}"
     -D "LOSS_LOG_DIR=${AL_SHIM_VERSION_UNSET_LOSS_LOG_DIR}"
+    -D "SCENARIO=al-fortran-test-shim-version-unset"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
 )
 # IMAS_MVDD_HLI_DD_VERSION is deliberately absent from this ENVIRONMENT: that
@@ -450,6 +510,7 @@ add_test(NAME al-fortran-test-shim-version-unset
 set_tests_properties(al-fortran-test-shim-version-unset PROPERTIES
   ENVIRONMENT "IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_VERSION_UNSET_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 add_executable(al-fortran-test-shim-stamp-equal test_shim_stamp_equal.f90)
@@ -460,9 +521,11 @@ add_test(NAME al-fortran-test-shim-stamp-equal
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-stamp-equal>;${AL_SHIM_FIXTURE_ROOT}"
     -D "LOSS_LOG_DIR=${AL_SHIM_STAMP_EQUAL_LOSS_LOG_DIR}"
+    -D "SCENARIO=al-fortran-test-shim-stamp-equal"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
 )
 set_tests_properties(al-fortran-test-shim-stamp-equal PROPERTIES
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_STAMP_EQUAL_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )

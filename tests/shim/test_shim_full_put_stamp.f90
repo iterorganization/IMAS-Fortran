@@ -17,11 +17,11 @@ program test_shim_full_put_stamp
   integer :: context, status
 
   call get_command_argument(1, fixture)
-  if (len_trim(fixture) == 0) error stop 'missing full-put fixture'
+  if (len_trim(fixture) == 0) error stop 'SCENARIO-FAILURE: missing full-put fixture'
 
   call imas_open('imas:hdf5?path='//trim(fixture), OPEN_PULSE, context)
   call ids_get(context, 'equilibrium', written, status)
-  if (status < 0) error stop 'full-put setup read failed'
+  if (status < 0) error stop 'SCENARIO-FAILURE: full-put setup read failed'
 
   ! code follows ids_properties in the generated full-put traversal.  Reading
   ! it back therefore proves this operation did not stop at the refused stamp.
@@ -29,21 +29,21 @@ program test_shim_full_put_stamp
   written%code%name(1) = completion_marker
 
   call ids_put(context, 'equilibrium', written, status)
-  if (status /= PARTIAL_PUT) error stop 'full put did not report the tolerated stamp refusal'
+  if (status /= PARTIAL_PUT) error stop 'SCENARIO-FAILURE: full put did not report the tolerated stamp refusal'
 
   call ids_get(context, 'equilibrium', read_back, status)
   call imas_close(context)
-  if (status < 0) error stop 'full-put verification read failed'
+  if (status < 0) error stop 'SCENARIO-FAILURE: full-put verification read failed'
 
-  if (.not. associated(read_back%code%name)) error stop 'full put did not reach code/name'
+  if (.not. associated(read_back%code%name)) error stop 'SCENARIO-FAILURE: full put did not reach code/name'
   if (trim(read_back%code%name(1)) /= completion_marker) then
-    error stop 'full put stopped before code/name'
+    error stop 'SCENARIO-FAILURE: full put stopped before code/name'
   end if
 
   if (.not. associated(read_back%ids_properties%version_put%data_dictionary)) then
-    error stop 'full put removed the stored DD version stamp'
+    error stop 'SCENARIO-FAILURE: full put removed the stored DD version stamp'
   end if
   if (trim(read_back%ids_properties%version_put%data_dictionary(1)) /= stored_dd_version) then
-    error stop 'full put rewrote the stored DD version stamp'
+    error stop 'SCENARIO-FAILURE: full put rewrote the stored DD version stamp'
   end if
 end program test_shim_full_put_stamp

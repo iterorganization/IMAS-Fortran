@@ -1,8 +1,8 @@
 # Run a cross-DD HLI read and inspect its Tier-1 loss-log file.  This stays at
 # the HLI boundary: direct imas_mvdd_context_loss_* calls are a shim-repository
 # concern (ADR 0002), while the file is the only loss channel this binding owns.
-if( NOT DEFINED COMMAND_TO_RUN OR NOT DEFINED LOSS_LOG_DIR OR NOT DEFINED FIXTURE_ROOT )
-  message(FATAL_ERROR "COMMAND_TO_RUN, LOSS_LOG_DIR and FIXTURE_ROOT are required")
+if( NOT DEFINED LOSS_LOG_DIR OR NOT DEFINED FIXTURE_ROOT )
+  message(FATAL_ERROR "SCENARIO-FAILURE: LOSS_LOG_DIR and FIXTURE_ROOT are required")
 endif()
 
 # Issue #66 asks that the checked-in fixture is byte-identical after a
@@ -28,34 +28,21 @@ endfunction()
 
 fixture_digest(_fixture_before)
 if( _fixture_before STREQUAL "" )
-  message(FATAL_ERROR "no fixture files found under ${FIXTURE_ROOT}: the immutability check would pass vacuously")
+  message(FATAL_ERROR "SCENARIO-FAILURE: no fixture files found under ${FIXTURE_ROOT}: the immutability check would pass vacuously")
 endif()
 
-file(MAKE_DIRECTORY "${LOSS_LOG_DIR}")
-file(GLOB _old_logs "${LOSS_LOG_DIR}/imas-mvdd-loss-*.txt")
-if( _old_logs )
-  file(REMOVE ${_old_logs})
-endif()
-
-execute_process(
-  COMMAND ${COMMAND_TO_RUN}
-  RESULT_VARIABLE _result
-  OUTPUT_VARIABLE _stdout
-  ERROR_VARIABLE _stderr
-)
-if( NOT _result EQUAL 0 )
-  message(FATAL_ERROR "nested loss reader failed (${_result})\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/clean_loss_log_dir.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/run_scenario.cmake")
 
 fixture_digest(_fixture_after)
 if( NOT _fixture_after STREQUAL _fixture_before )
-  message(SEND_ERROR "the cross-version read modified the checked-in fixture under ${FIXTURE_ROOT}")
+  message(SEND_ERROR "SCENARIO-FAILURE: the cross-version read modified the checked-in fixture under ${FIXTURE_ROOT}")
 endif()
 
 file(GLOB _logs "${LOSS_LOG_DIR}/imas-mvdd-loss-*.txt")
 list(LENGTH _logs _log_count)
 if( NOT _log_count EQUAL 1 )
-  message(FATAL_ERROR "expected one isolated loss log, found ${_log_count} in ${LOSS_LOG_DIR}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: expected one isolated loss log file, found ${_log_count} in ${LOSS_LOG_DIR}")
 endif()
 list(GET _logs 0 _log)
 file(READ "${_log}" _contents)
@@ -67,7 +54,7 @@ string(REPLACE "\n" ";" _lines "${_contents}")
 # format change look like a test with no losses.
 list(GET _lines 0 _format_marker)
 if( NOT _format_marker STREQUAL "# imas-mvdd loss log format 1" )
-  message(FATAL_ERROR "unexpected loss-log format marker: ${_format_marker}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: unexpected loss-log format marker: ${_format_marker}")
 endif()
 
 # The header is tab-separated data, not a comment.  Skip it by its fixed
@@ -75,7 +62,7 @@ endif()
 # incorrectly feed the header to the loss-entry parser.
 list(GET _lines 4 _header)
 if( NOT _header STREQUAL "uri${_tab}ids${_tab}stored-dd${_tab}hli-dd${_tab}operation${_tab}fidelity${_tab}path" )
-  message(FATAL_ERROR "unexpected loss-log column header: ${_header}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: unexpected loss-log column header: ${_header}")
 endif()
 list(SUBLIST _lines 5 -1 _records)
 
@@ -103,7 +90,7 @@ foreach(_record IN LISTS _records)
   string(REPLACE "${_tab}" ";" _columns "${_record}")
   list(LENGTH _columns _column_count)
   if( NOT _column_count EQUAL 7 )
-    message(FATAL_ERROR "loss-log entry has ${_column_count} columns: ${_record}")
+    message(FATAL_ERROR "SCENARIO-FAILURE: loss-log entry has ${_column_count} columns: ${_record}")
   endif()
   list(GET _columns 4 _operation)
   list(GET _columns 5 _fidelity)
@@ -139,7 +126,7 @@ endforeach()
 if( _defect_hits )
   list(JOIN _defect_hits "\n" _defect_display)
   message(SEND_ERROR
-    "the shim still refuses the unit-redefined chi_squared paths, so it records "
+    "SCENARIO-FAILURE: the shim still refuses the unit-redefined chi_squared paths, so it records "
     "them as unmappable rather than serving them (issue #72):\n${_defect_display}")
 endif()
 
@@ -148,5 +135,5 @@ list(SORT _actual_records)
 if( NOT _actual_records STREQUAL _expected_records )
   list(JOIN _expected_records "\n" _expected_display)
   list(JOIN _actual_records "\n" _actual_display)
-  message(FATAL_ERROR "unexpected operation-fidelity-path set\nexpected:\n${_expected_display}\nactual:\n${_actual_display}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: unexpected operation-fidelity-path set\nexpected:\n${_expected_display}\nactual:\n${_actual_display}")
 endif()

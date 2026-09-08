@@ -19,19 +19,19 @@ program test_shim_version_unset
   integer :: context, open_status, get_status
 
   call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
+  if (len_trim(fixture_root) == 0) error stop 'SCENARIO-FAILURE: missing fixture root'
 
   call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-3.39.0', OPEN_PULSE, context, open_status)
-  if (open_status /= 0) error stop 'version-unset open did not forward'
+  if (open_status /= 0) error stop 'SCENARIO-FAILURE: version-unset open did not forward'
 
   call ids_get(context, 'equilibrium', equilibrium, get_status)
   call imas_close(context)
 
-  if (get_status /= 0) error stop 'version-unset read did not forward cleanly'
-  if (al_get_skipped_count() /= 0) error stop 'version-unset read logged a skipped path'
-  if (.not. associated(equilibrium%time)) error stop 'version-unset read reached no data'
-  if (size(equilibrium%time) /= 2) error stop 'version-unset read returned an unexpected time base'
-  if (.not. associated(equilibrium%time_slice)) error stop 'version-unset read reached no time slices'
+  if (get_status /= 0) error stop 'SCENARIO-FAILURE: version-unset read did not forward cleanly'
+  if (al_get_skipped_count() /= 0) error stop 'SCENARIO-FAILURE: version-unset read logged a skipped path'
+  if (.not. associated(equilibrium%time)) error stop 'SCENARIO-FAILURE: version-unset read reached no data'
+  if (size(equilibrium%time) /= 2) error stop 'SCENARIO-FAILURE: version-unset read returned an unexpected time base'
+  if (.not. associated(equilibrium%time_slice)) error stop 'SCENARIO-FAILURE: version-unset read reached no time slices'
 
   ! beta_tor_norm is DD 4's renamed name for DD 3's beta_normal
   ! (shim_rule_table.f90, rule 'rename-beta-normal').  Undiscovered, the shim
@@ -39,6 +39,6 @@ program test_shim_version_unset
   ! file -- this stays at its ids_real_invalid default rather than arriving
   ! converted, which is what would happen if version discovery had run.
   if (equilibrium%time_slice(1)%global_quantities%beta_tor_norm > absent_threshold) then
-    error stop 'version-unset read populated a renamed field: version discovery ran'
+    error stop 'SCENARIO-FAILURE: version-unset read populated a renamed field: version discovery ran'
   end if
 end program test_shim_version_unset

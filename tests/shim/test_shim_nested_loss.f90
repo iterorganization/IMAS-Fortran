@@ -11,12 +11,12 @@ program test_shim_nested_loss
   integer :: context, status
 
   call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
+  if (len_trim(fixture_root) == 0) error stop 'SCENARIO-FAILURE: missing fixture root'
 
   call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-3.39.0', OPEN_PULSE, context)
   call ids_get(context, 'equilibrium', equilibrium, status)
   call imas_close(context)
 
-  if (status /= PARTIAL_READ) error stop 'cross-DD nested read did not report PARTIAL_READ'
-  if (al_get_skipped_count() == 0) error stop 'cross-DD nested read skipped no refused paths'
+  if (status /= PARTIAL_READ) error stop 'SCENARIO-FAILURE: cross-DD nested read did not report PARTIAL_READ'
+  if (al_get_skipped_count() == 0) error stop 'SCENARIO-FAILURE: cross-DD nested read skipped no refused paths'
 end program test_shim_nested_loss

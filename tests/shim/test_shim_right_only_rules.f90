@@ -25,44 +25,41 @@
 ! the DD 4 side. That is a legibility defect in a failure message rather than
 ! a wrong result, and it belongs to that test rather than this one.
 !
-! This is also why the loss log is a second channel rather than the only one:
-! a value comparison on its own distinguishes a served field from a refused
-! one, provided the shim-read column is the second argument.
+! This is also why the loss log file is a second channel rather than the only
+! one: a value comparison on its own distinguishes a served field from a
+! refused one, provided the shim-read column is the second argument.
 ! ---------------------------------------------------------------------------
 !
 ! A failing check names the rule that broke (id, kind and cited source), not
 ! only the field.
 program test_shim_right_only_rules
-  use ids_routines, only: ids_equilibrium, OPEN_PULSE, imas_open, imas_close, ids_get, ids_real
-  use al_get_policy, only: PARTIAL_READ
-  use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector
+  use ids_routines, only: ids_equilibrium, ids_real
+  use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
+                               read_same_version, assert_reads_usable
+  use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence
+  use shim_comparison, only: verdict_len
   use shim_rule_table, only: right_only_rules, structural_rules, &
                              expected_verdict_for_kind, rule_kind_right_only
   use shim_rule_check, only: rule_checker, verdicts_agree
+  use shim_run_guard, only: assert_ran_count
   implicit none
 
   type(ids_equilibrium) :: eq_cross, eq_control
   character(len=512) :: fixture_root
-  integer :: context, status_cross, status_control
+  integer :: status_cross, status_control
   integer :: demonstrations
+  ! Stated up front so a demonstration lost in an edit fails the run rather
+  ! than quietly shrinking it.  Raise it when adding one.
+  integer, parameter :: expected_demonstrations = 2
   type(rule_checker) :: checker
   logical :: has_cross, has_control
   real(ids_real), allocatable :: cross_values(:), control_values(:)
-  character(len=6) :: served_nothing, agreement_expected
+  character(len=verdict_len) :: served_nothing, agreement_expected
 
-  call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-3.39.0', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_cross, status_cross)
-  call imas_close(context)
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-4.1.1', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_control, status_control)
-  call imas_close(context)
-
-  if (status_control /= 0) error stop 'same-version control read did not succeed cleanly'
-  if (status_cross /= 0 .and. status_cross /= PARTIAL_READ) error stop 'cross-version read failed outright'
+  fixture_root = fixture_root_from_command()
+  call read_cross_version(fixture_root, eq_cross, status_cross)
+  call read_same_version(fixture_root, eq_control, status_control)
+  call assert_reads_usable(status_cross, status_control)
   ! Every check below indexes time_slice(1), so an associated but empty array
   ! would be an out-of-bounds read rather than a failed assertion.
   if (.not. has_time_slice(eq_control)) error stop 'control read produced no time slices'
@@ -80,13 +77,13 @@ program test_shim_right_only_rules
   call gather_contour_nodes(eq_control, control_values, has_control)
   call gather_contour_nodes(eq_cross, cross_values, has_cross)
   call checker%check('new-contour-tree', combine([ &
-       verdict_real_vector(has_control, control_values, has_cross, cross_values), &
+       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values), &
        contour_edges_verdict(eq_control, eq_cross)]))
 
   call gather_j_parallel(eq_control, control_values, has_control)
   call gather_j_parallel(eq_cross, cross_values, has_cross)
   call checker%check('new-constraints-j-parallel', &
-       verdict_real_vector(has_control, control_values, has_cross, cross_values))
+       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values))
 
   ! `convergence/result` is an identifier structure whose only leaf in the
   ! map's two-path note is `index`; the shim serving nothing leaves it at the
@@ -132,7 +129,7 @@ program test_shim_right_only_rules
   call gather_p1d_psi_norm(eq_control, control_values, has_control)
   call gather_p1d_psi_norm(eq_cross, cross_values, has_cross)
   call checker%check('new-profiles-1d-psi-norm', &
-       verdict_real_vector(has_control, control_values, has_cross, cross_values))
+       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values))
 
   ! -------------------------------------------------------------------------
   ! The hole this closes, demonstrated rather than asserted in prose.
@@ -171,10 +168,8 @@ program test_shim_right_only_rules
 
   call checker%assert_every_rule_checked(checker%expectations)
 
-  if (demonstrations /= 2) then
-    write(*, '(a,i0,a)') 'RIGHT-ONLY-FAILURE: only ', demonstrations, ' of 2 demonstrations were run'
-    checker%failures = checker%failures + 1
-  end if
+  call assert_ran_count(checker%marker, 'demonstrations were run', &
+                        demonstrations, expected_demonstrations, checker%failures)
 
   if (checker%failures > 0) then
     write(*, '(a,i0,a)') 'RIGHT-ONLY-FAILURE: ', checker%failures, ' right_only rule(s) failed'
@@ -189,9 +184,9 @@ contains
   ! not meet the rule's expectation is the verdict reported, so the failure
   ! message names what actually went wrong rather than the expectation.
   function combine(verdicts) result(combined)
-    character(len=6), intent(in) :: verdicts(:)
-    character(len=6) :: combined
-    character(len=6) :: expected
+    character(len=verdict_len), intent(in) :: verdicts(:)
+    character(len=verdict_len) :: combined
+    character(len=verdict_len) :: expected
     integer :: leaf
 
     expected = expected_verdict_for_kind(rule_kind_right_only)
@@ -217,13 +212,13 @@ contains
   ! sample, and a shim serving part of a subtree would not be caught here.
   function contour_edges_verdict(control, cross) result(verdict)
     type(ids_equilibrium), intent(in) :: control, cross
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
     real(ids_real), allocatable :: control_edges(:), cross_edges(:)
     logical :: control_has, cross_has
 
     call gather_contour_edges(control, control_edges, control_has)
     call gather_contour_edges(cross, cross_edges, cross_has)
-    verdict = verdict_real_vector(control_has, control_edges, cross_has, cross_edges)
+    verdict = verdict_real_vector_with_stated_presence(control_has, control_edges, cross_has, cross_edges)
   end function contour_edges_verdict
 
   logical function has_time_slice(equilibrium)
@@ -249,22 +244,35 @@ contains
   ! `DIFF` or `SHAPE` rather than `only4`. The rule would still fail, and its
   ! verdict would still name the disagreement — but it would not name it as a
   ! served-nothing reading.
+  ! The reading a gather_* starts from and keeps if its container was never
+  ! served: absent, and a zero-length array rather than an unallocated one, so
+  ! a caller may pass it to the comparison primitives without checking first.
+  !
+  ! Every gather_* below opens with this and returns early, which is what
+  ! makes the four of them say only what differs -- which container they probe
+  ! and how they flatten it.  Assigning to an allocatable reallocates it, so
+  ! the served path needs no deallocate.
+  subroutine gather_nothing(values, is_present)
+    real(ids_real), allocatable, intent(out) :: values(:)
+    logical, intent(out) :: is_present
+
+    is_present = .false.
+    allocate(values(0))
+  end subroutine gather_nothing
+
   subroutine gather_contour_nodes(equilibrium, values, is_present)
     type(ids_equilibrium), intent(in) :: equilibrium
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%contour_tree%node)) then
-      is_present = size(equilibrium%time_slice(1)%contour_tree%node) > 0
-    end if
-    if (is_present) then
-      values = [equilibrium%time_slice(1)%contour_tree%node(:)%psi, &
-                equilibrium%time_slice(1)%contour_tree%node(:)%r,   &
-                equilibrium%time_slice(1)%contour_tree%node(:)%z]
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%contour_tree%node)) return
+    if (size(equilibrium%time_slice(1)%contour_tree%node) == 0) return
+
+    is_present = .true.
+    values = [equilibrium%time_slice(1)%contour_tree%node(:)%psi, &
+              equilibrium%time_slice(1)%contour_tree%node(:)%r,   &
+              equilibrium%time_slice(1)%contour_tree%node(:)%z]
   end subroutine gather_contour_nodes
 
   subroutine gather_contour_edges(equilibrium, values, is_present)
@@ -272,16 +280,13 @@ contains
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%contour_tree%edges)) then
-      is_present = size(equilibrium%time_slice(1)%contour_tree%edges) > 0
-    end if
-    if (is_present) then
-      values = real(reshape(equilibrium%time_slice(1)%contour_tree%edges, &
-                            [size(equilibrium%time_slice(1)%contour_tree%edges)]), ids_real)
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%contour_tree%edges)) return
+    if (size(equilibrium%time_slice(1)%contour_tree%edges) == 0) return
+
+    is_present = .true.
+    values = real(reshape(equilibrium%time_slice(1)%contour_tree%edges, &
+                          [size(equilibrium%time_slice(1)%contour_tree%edges)]), ids_real)
   end subroutine gather_contour_edges
 
   subroutine gather_j_parallel(equilibrium, values, is_present)
@@ -289,17 +294,14 @@ contains
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%constraints%j_parallel)) then
-      is_present = size(equilibrium%time_slice(1)%constraints%j_parallel) > 0
-    end if
-    if (is_present) then
-      values = [equilibrium%time_slice(1)%constraints%j_parallel(:)%measured,      &
-                equilibrium%time_slice(1)%constraints%j_parallel(:)%reconstructed, &
-                equilibrium%time_slice(1)%constraints%j_parallel(:)%position%psi]
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%constraints%j_parallel)) return
+    if (size(equilibrium%time_slice(1)%constraints%j_parallel) == 0) return
+
+    is_present = .true.
+    values = [equilibrium%time_slice(1)%constraints%j_parallel(:)%measured,      &
+              equilibrium%time_slice(1)%constraints%j_parallel(:)%reconstructed, &
+              equilibrium%time_slice(1)%constraints%j_parallel(:)%position%psi]
   end subroutine gather_j_parallel
 
   subroutine gather_p1d_psi_norm(equilibrium, values, is_present)
@@ -307,15 +309,12 @@ contains
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%profiles_1d%psi_norm)) then
-      is_present = size(equilibrium%time_slice(1)%profiles_1d%psi_norm) > 0
-    end if
-    if (is_present) then
-      values = equilibrium%time_slice(1)%profiles_1d%psi_norm
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%profiles_1d%psi_norm)) return
+    if (size(equilibrium%time_slice(1)%profiles_1d%psi_norm) == 0) return
+
+    is_present = .true.
+    values = equilibrium%time_slice(1)%profiles_1d%psi_norm
   end subroutine gather_p1d_psi_norm
 
 

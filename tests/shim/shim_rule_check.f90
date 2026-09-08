@@ -18,6 +18,8 @@
 ! this type has no business knowing about.
 module shim_rule_check
   use shim_rule_table, only: rule_entry, expected_verdict_for_kind, kind_name
+  use shim_comparison, only: verdict_len
+  use shim_run_guard, only: assert_ran_count
   implicit none
   private
 
@@ -73,7 +75,7 @@ contains
   function checker_expected_for(self, id) result(expected)
     class(rule_checker), intent(in) :: self
     character(len=*), intent(in) :: id
-    character(len=6) :: expected
+    character(len=verdict_len) :: expected
 
     expected = expected_verdict_for_kind(self%rules(self%find(id))%kind)
   end function checker_expected_for
@@ -88,7 +90,7 @@ contains
     character(len=*), intent(in) :: verdict
     character(len=*), intent(in), optional :: note
     integer :: idx
-    character(len=6) :: expected
+    character(len=verdict_len) :: expected
 
     idx = self%find(id)
     expected = expected_verdict_for_kind(self%rules(idx)%kind)
@@ -113,9 +115,9 @@ contains
     write(*, '(a,a,a)') trim(self%marker), ': ', trim(what)
   end subroutine checker_fail
 
-  ! The guard that stops a program that asserted nothing from passing: the
-  ! suite's tests are judged by not printing, so a run that checked no rule at
-  ! all would otherwise look exactly like a run that checked them all.
+  ! This type's use of the suite's shared run guard (shim_run_guard): the
+  ! expected count is the table's own size, so a program cannot state it
+  ! wrongly.
   !
   ! `checked` is passed in rather than read from self%expectations because the
   ! programs count other assertions in the same counter.
@@ -123,10 +125,8 @@ contains
     class(rule_checker), intent(inout) :: self
     integer, intent(in) :: checked
 
-    if (checked == size(self%rules)) return
-    self%failures = self%failures + 1
-    write(*, '(a,a,i0,a,i0,a)') trim(self%marker), ': only ', checked, ' of ', size(self%rules), &
-      ' rule table entries were checked'
+    call assert_ran_count(self%marker, 'rule table entries were checked', &
+                          checked, size(self%rules), self%failures)
   end subroutine checker_assert_every_rule_checked
 
 end module shim_rule_check

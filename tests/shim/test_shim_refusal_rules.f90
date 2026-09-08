@@ -57,20 +57,22 @@
 ! identifier structures, and it is asserted as a tolerated refusal.
 program test_shim_refusal_rules
   use ids_routines, only: ids_equilibrium, ids_equilibrium_constraints_pure_position, &
-                          OPEN_PULSE, imas_open, imas_close, ids_get, &
                           ids_real, ids_real_invalid, ids_int, ids_int_invalid
   use al_defs, only: MAX_ERR_MSG_LEN, is_external_refusal
   use al_get_policy, only: PARTIAL_READ, al_get_skipped_count, al_get_skipped_path, &
                            AL_SKIP_PATH_LEN, AL_SKIP_LOG_CAPACITY
-  use shim_comparison, only: verdict_real, verdict_integer
+  use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
+                               read_same_version
+  use shim_comparison, only: verdict_real, verdict_integer, verdict_len
   use shim_rule_check, only: rule_checker
+  use shim_run_guard, only: assert_ran_count
   use shim_rule_table, only: refusal_rules, expected_verdict_for_kind, &
                              kind_name, retyped_refusal_reason, redefined_refusal_reason
   implicit none
 
   type(ids_equilibrium) :: eq_cross, eq_control
   character(len=512) :: fixture_root
-  integer :: context, status_cross, status_control
+  integer :: status_cross, status_control
   integer :: expectations, rules_checked
   type(rule_checker) :: checker
 
@@ -86,8 +88,7 @@ program test_shim_refusal_rules
   ! silently shrinking it. Raise it when adding one.
   integer, parameter :: expected_expectation_count = 11
 
-  call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
+  fixture_root = fixture_root_from_command()
 
   checker%rules = refusal_rules
   checker%marker = 'REFUSAL-FAILURE'
@@ -96,9 +97,7 @@ program test_shim_refusal_rules
 
   ! The DD 3.39.0 pulse, read through the shim by a DD 4.1.1 HLI: the read
   ! that must refuse.
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-3.39.0', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_cross, status_cross)
-  call imas_close(context)
+  call read_cross_version(fixture_root, eq_cross, status_cross)
 
   ! al_get_policy resets its log at the start of every ids_get, so the log
   ! has to be copied out here -- the control read below would otherwise erase
@@ -107,9 +106,7 @@ program test_shim_refusal_rules
 
   ! The DD 4.1.1 pulse read same-version: no conversion, so it is the oracle
   ! for what each refused path would have held had it been servable.
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-4.1.1', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_control, status_control)
-  call imas_close(context)
+  call read_same_version(fixture_root, eq_control, status_control)
 
   ! Preconditions, asserted rather than assumed: without either of these the
   ! verdicts below would be absent-versus-absent and would prove nothing.
@@ -191,8 +188,8 @@ program test_shim_refusal_rules
                        chi_squared_z_of(eq_cross%time_slice(1)%constraints%strike_point))
 
   ! -- Nothing here may pass by doing nothing. ---------------------------
-  call expect(expectations == expected_expectation_count, &
-              'every expectation in this program must run')
+  call assert_ran_count(checker%marker, 'expectations in this program ran', &
+                        expectations, expected_expectation_count, checker%failures)
 
   call checker%assert_every_rule_checked(rules_checked)
 
@@ -383,7 +380,7 @@ contains
   ! and report the rule rather than the field when they differ.
   subroutine check_rule(id, verdict)
     character(len=*), intent(in) :: id
-    character(len=6), intent(in) :: verdict
+    character(len=verdict_len), intent(in) :: verdict
 
     rules_checked = rules_checked + 1
     call checker%check(id, verdict)
