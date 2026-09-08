@@ -165,6 +165,7 @@ set_tests_properties(al-fortran-test-shim-nested-loss PROPERTIES
 # and its citations.
 add_executable(al-fortran-test-shim-structural-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_structural_rules.f90
@@ -193,6 +194,7 @@ set_tests_properties(al-fortran-test-shim-structural-rules PROPERTIES
 # entries rather than the 32 commonly quoted elsewhere.
 add_executable(al-fortran-test-shim-cocos-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_cocos_rules.f90
@@ -218,6 +220,7 @@ set_tests_properties(al-fortran-test-shim-cocos-rules PROPERTIES
 # why at length.
 add_executable(al-fortran-test-shim-right-only-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_right_only_rules.f90
@@ -260,6 +263,7 @@ set_tests_properties(al-fortran-test-shim-right-only-rules PROPERTIES
 al_shim_private_loss_log(al-fortran-test-shim-refusal-rules AL_SHIM_REFUSAL_LOSS_LOG_DIR)
 add_executable(al-fortran-test-shim-refusal-rules
   shim_comparison.f90
+  shim_fixture_pair.f90
   shim_rule_table.f90
   shim_rule_check.f90
   test_shim_refusal_rules.f90

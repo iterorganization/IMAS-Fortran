@@ -21,8 +21,9 @@
 ! program supplies no comparison logic of its own; per-rule kind and verdict
 ! come entirely from shim_rule_table, per the suite's stated-once design.
 program test_shim_cocos_rules
-  use ids_routines, only: ids_equilibrium, OPEN_PULSE, imas_open, imas_close, ids_get, ids_real
-  use al_get_policy, only: PARTIAL_READ
+  use ids_routines, only: ids_equilibrium, ids_real
+  use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
+                               read_same_version, assert_reads_usable
   use ids_schemas_equilibrium, only: ids_equilibrium_constraints_0D_position
   use shim_comparison, only: verdict_real, verdict_real_vector_by_size, verdict_real_matrix_by_size
   use shim_rule_table, only: cocos_rules
@@ -31,22 +32,13 @@ program test_shim_cocos_rules
 
   type(ids_equilibrium) :: eq_cross, eq_control
   character(len=512) :: fixture_root
-  integer :: context, status_cross, status_control
+  integer :: status_cross, status_control
   type(rule_checker) :: checker
 
-  call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-3.39.0', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_cross, status_cross)
-  call imas_close(context)
-
-  call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-4.1.1', OPEN_PULSE, context)
-  call ids_get(context, 'equilibrium', eq_control, status_control)
-  call imas_close(context)
-
-  if (status_control /= 0) error stop 'same-version control read did not succeed cleanly'
-  if (status_cross /= 0 .and. status_cross /= PARTIAL_READ) error stop 'cross-version read failed outright'
+  fixture_root = fixture_root_from_command()
+  call read_cross_version(fixture_root, eq_cross, status_cross)
+  call read_same_version(fixture_root, eq_control, status_control)
+  call assert_reads_usable(status_cross, status_control)
 
   checker%rules = cocos_rules
   checker%marker = 'COCOS-FAILURE'
