@@ -36,6 +36,23 @@ has unresolved includes, so generation could silently under-cover. Fixtures are
 load-bearing generated artifacts, not disposable test data; scenario-specific
 stamp variants are derived at build time rather than committed.
 
+**Where a count in the map and a count in a ticket disagree, the map wins.**
+Issue #63 and issue #68 both say the map's `<cocos>` block holds 32 paths.
+It holds 30, on every commit that has ever touched
+`docs/3.39.0--4.1.1.xml` (c0beaaf, 333996f, 6a87941, 2022a17), so 32 is a
+stale count rather than a moving target. `shim_rule_table.f90` carries 30 and
+states its reasoning at the table. Padding it to 32 would assert agreement on
+a path no fixture and no map actually flips — the suite would report a
+coverage it does not have, which is worse than either number being wrong on
+its own. The two other negated paths that make the total look like 32
+(`constraints/j_parallel/position/psi`, `contour_tree/node/psi`) have no DD 3
+source, so there is no conversion for a sign flip to be a statement about;
+they are asserted as `right_only` rules, which is the whole of what the shim
+owes for them.
+
+**Issues #63 and #68 still carry the stale 32 and need correcting there.**
+This ADR records the reconciliation; it does not close it.
+
 ## Consequences
 
 - The suite is expected to have known contract-assertion failures on arrival,
