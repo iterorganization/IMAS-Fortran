@@ -1,11 +1,17 @@
-# Linkage test for the multiversion shim
+# The shim integration test suite (issue #63)
 #
-# Registered only in a shim build: with AL_USE_MULTIVERSION_SHIM off there is
-# nothing to assert and the test list stays exactly what it was.
+# The linkage test below, then the contract assertions and behaviour pins that
+# check the shim's conversion rule by rule: the comparison oracle, fixture
+# provenance, the structural, COCOS, right_only and refusal rule tables, the
+# loss log file, the write-side scenarios, and the passthrough scenarios.
+#
+# The whole file is registered only in a shim build: with
+# AL_USE_MULTIVERSION_SHIM off there is nothing to assert and the test list
+# stays exactly what it was.
 
 if( WIN32 )
   # The shim resolves AL core through dlopen/dlsym, so a shim build is POSIX-only.
-  message( STATUS "Not registering al-fortran-test-shim-linkage: not supported on Windows" )
+  message( STATUS "Not registering the shim test suite: not supported on Windows" )
   return()
 endif()
 
@@ -24,7 +30,9 @@ else()
 endif()
 
 if( NOT AL_SHIM_INSPECT_TOOL )
-  message( STATUS "Not registering al-fortran-test-shim-linkage: no dependency inspection tool found" )
+  # This return() skips the whole suite, not only the linkage test, because
+  # every test below is registered after it.
+  message( STATUS "Not registering the shim test suite: no dependency inspection tool found" )
   return()
 endif()
 
