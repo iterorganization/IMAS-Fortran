@@ -327,9 +327,10 @@ set_tests_properties(al-fortran-test-shim-full-put-stamp PROPERTIES
   LABELS "shim;contract-assertion"
 )
 
-# A stamp is read while opening an occurrence, so these two states have to be
-# present in the pulse before the program begins.  The checked-in DD 3 pulse is
-# copied and its one stamp dataset is removed or malformed at build time; no
+# A stamp is read while opening an occurrence, so these three states have to
+# be present in the pulse before the program begins.  The checked-in DD 3
+# pulse is copied and its one stamp dataset is removed, malformed, or set to
+# a version the shipped artifact does not cover, at build time; no
 # scenario-specific HDF5 artifact is kept in the repository.
 set(AL_SHIM_STAMP_VARIANT_PYTHON "${CMAKE_SOURCE_DIR}/imas-python-fixtures/.venv/bin/python")
 set(AL_SHIM_STAMP_VARIANT_TOOLING_AVAILABLE FALSE)
@@ -352,16 +353,20 @@ else()
   set(AL_SHIM_STAMP_VARIANT_SOURCE "${AL_SHIM_FIXTURE_ROOT}/dd-3.39.0")
   set(AL_SHIM_STAMP_ABSENT_FIXTURE "${CMAKE_CURRENT_BINARY_DIR}/stamp-absent-fixture")
   set(AL_SHIM_STAMP_MALFORMED_FIXTURE "${CMAKE_CURRENT_BINARY_DIR}/stamp-malformed-fixture")
+  set(AL_SHIM_STAMP_MISMATCH_FIXTURE "${CMAKE_CURRENT_BINARY_DIR}/stamp-mismatch-fixture")
   set(AL_SHIM_STAMP_VARIANT_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/derive_stamp_variant.py")
 
   add_custom_command(
     OUTPUT
       "${AL_SHIM_STAMP_ABSENT_FIXTURE}/equilibrium.h5"
       "${AL_SHIM_STAMP_MALFORMED_FIXTURE}/equilibrium.h5"
+      "${AL_SHIM_STAMP_MISMATCH_FIXTURE}/equilibrium.h5"
     COMMAND "${AL_SHIM_STAMP_VARIANT_PYTHON}" "${AL_SHIM_STAMP_VARIANT_SCRIPT}"
       "${AL_SHIM_STAMP_VARIANT_SOURCE}" "${AL_SHIM_STAMP_ABSENT_FIXTURE}" absent
     COMMAND "${AL_SHIM_STAMP_VARIANT_PYTHON}" "${AL_SHIM_STAMP_VARIANT_SCRIPT}"
       "${AL_SHIM_STAMP_VARIANT_SOURCE}" "${AL_SHIM_STAMP_MALFORMED_FIXTURE}" malformed
+    COMMAND "${AL_SHIM_STAMP_VARIANT_PYTHON}" "${AL_SHIM_STAMP_VARIANT_SCRIPT}"
+      "${AL_SHIM_STAMP_VARIANT_SOURCE}" "${AL_SHIM_STAMP_MISMATCH_FIXTURE}" mismatch
     DEPENDS
       "${AL_SHIM_STAMP_VARIANT_SCRIPT}"
       "${AL_SHIM_STAMP_VARIANT_SOURCE}/equilibrium.h5"
@@ -371,6 +376,7 @@ else()
   add_custom_target(al-fortran-test-shim-stamp-fixtures ALL DEPENDS
     "${AL_SHIM_STAMP_ABSENT_FIXTURE}/equilibrium.h5"
     "${AL_SHIM_STAMP_MALFORMED_FIXTURE}/equilibrium.h5"
+    "${AL_SHIM_STAMP_MISMATCH_FIXTURE}/equilibrium.h5"
   )
 
   function(add_shim_stamp_test name fixture require_no_loss_log)
@@ -404,4 +410,59 @@ else()
 
   add_shim_stamp_test(stamp-absent "${AL_SHIM_STAMP_ABSENT_FIXTURE}" TRUE)
   add_shim_stamp_test(stamp-malformed "${AL_SHIM_STAMP_MALFORMED_FIXTURE}" FALSE)
+  # Third passthrough scenario of issue #77 -- see the comment block below
+  # this whole if/else for the other two, which need no derived fixture and
+  # so are not gated on this stamp-variant tooling.
+  add_shim_stamp_test(stamp-mismatch-no-artifact "${AL_SHIM_STAMP_MISMATCH_FIXTURE}" TRUE)
 endif()
+
+# Passthrough scenarios (issue #77): the three ways nothing is supposed to
+# happen, each proven rather than assumed by asserting the loss directory
+# stays empty via check_no_shim_loss_log.cmake -- the only way "no file means
+# no loss" becomes enforced, and the only way the third scenario becomes
+# assertable at all (its forwarding is otherwise indistinguishable from the
+# second's, by contract).
+#
+#   1. al-fortran-test-shim-version-unset      -- IMAS_MVDD_HLI_DD_VERSION unset
+#   2. al-fortran-test-shim-stamp-equal         -- stamp equals the HLI version
+#   3. al-fortran-test-shim-stamp-mismatch-no-artifact (above, needs a derived
+#      fixture, so it lives inside the stamp-variant-tooling block)
+#
+# Each scenario needs its own HLI DD version for the whole process (ADR 0005's
+# one-version-per-process rule: a second, different value is refused, not
+# applied), and a ctest test is its own process, so registering these as three
+# separate executables/tests -- rather than branching inside one program -- is
+# what satisfies that constraint. No in-test mechanism is needed or possible.
+add_executable(al-fortran-test-shim-version-unset test_shim_version_unset.f90)
+target_link_libraries(al-fortran-test-shim-version-unset PRIVATE al-fortran)
+al_shim_private_module_dir(al-fortran-test-shim-version-unset)
+set(AL_SHIM_VERSION_UNSET_LOSS_LOG_DIR "${CMAKE_CURRENT_BINARY_DIR}/version-unset-loss-log")
+add_test(NAME al-fortran-test-shim-version-unset
+  COMMAND ${CMAKE_COMMAND}
+    -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-version-unset>;${AL_SHIM_FIXTURE_ROOT}"
+    -D "LOSS_LOG_DIR=${AL_SHIM_VERSION_UNSET_LOSS_LOG_DIR}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
+)
+# IMAS_MVDD_HLI_DD_VERSION is deliberately absent from this ENVIRONMENT: that
+# is the scenario. IMAS_MVDD_LOSS_LOG_DIR is still given, and still private to
+# this test, so "no version discovery happened" is asserted as an empty
+# directory rather than mistaken for a missing one.
+set_tests_properties(al-fortran-test-shim-version-unset PROPERTIES
+  ENVIRONMENT "IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_VERSION_UNSET_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
+  LABELS "shim;contract-assertion"
+)
+
+add_executable(al-fortran-test-shim-stamp-equal test_shim_stamp_equal.f90)
+target_link_libraries(al-fortran-test-shim-stamp-equal PRIVATE al-fortran)
+al_shim_private_module_dir(al-fortran-test-shim-stamp-equal)
+set(AL_SHIM_STAMP_EQUAL_LOSS_LOG_DIR "${CMAKE_CURRENT_BINARY_DIR}/stamp-equal-loss-log")
+add_test(NAME al-fortran-test-shim-stamp-equal
+  COMMAND ${CMAKE_COMMAND}
+    -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-stamp-equal>;${AL_SHIM_FIXTURE_ROOT}"
+    -D "LOSS_LOG_DIR=${AL_SHIM_STAMP_EQUAL_LOSS_LOG_DIR}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
+)
+set_tests_properties(al-fortran-test-shim-stamp-equal PROPERTIES
+  ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_STAMP_EQUAL_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
+  LABELS "shim;contract-assertion"
+)

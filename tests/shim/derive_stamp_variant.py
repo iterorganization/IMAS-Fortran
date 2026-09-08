@@ -13,6 +13,13 @@ import h5py
 
 STAMP_DATASET = "/equilibrium/ids_properties&version_put&data_dictionary"
 
+# A grammar-valid, known DD release (see the shim's own DdVersion parser and
+# its KNOWN_RELEASES table) that is neither the HLI version (4.1.1) nor the
+# one version the shipped artifact covers (3.39.0).  A stamp naming this
+# version parses fine but matches no rule, so it derives the
+# mismatched-with-no-artifact scenario rather than the malformed one.
+MISMATCH_STAMP = "3.40.0"
+
 
 def derive(source: Path, destination: Path, state: str) -> None:
     if source.resolve() == destination.resolve():
@@ -26,15 +33,17 @@ def derive(source: Path, destination: Path, state: str) -> None:
             raise KeyError(f"source pulse has no DD-version stamp: {STAMP_DATASET}")
         if state == "absent":
             del pulse[STAMP_DATASET]
-        else:
+        elif state == "malformed":
             pulse[STAMP_DATASET][()] = "not-a-dd-version"
+        else:
+            pulse[STAMP_DATASET][()] = MISMATCH_STAMP
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
-    parser.add_argument("state", choices=("absent", "malformed"))
+    parser.add_argument("state", choices=("absent", "malformed", "mismatch"))
     args = parser.parse_args()
     derive(args.source, args.destination, args.state)
 
