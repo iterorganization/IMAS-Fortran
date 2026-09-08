@@ -547,6 +547,18 @@ contains
       ! Red by design: the shim refuses these today, so the observed verdict
       ! is 'only4' and this expectation fails until the shim serves them.
       ! Stated as the contract has it, not as the shim behaves.
+      !
+      ! Two tickets ask for opposite things here and this line follows one of
+      ! them deliberately. Issue #70 AC6 (and issue #63 US38) say "a quantity
+      ! whose unit the map records as redefined is asserted refused rather
+      ! than served", which would make this 'only4'. Issue #63's own rule
+      ! table and issue #72 say the four chi_squared paths must be asserted
+      ! as served, which makes it 'same'. The rule table wins: 'refused' is
+      ! what the shim does, and ADR 0002 says an assertion states the
+      ! contract rather than today's behaviour, so writing 'only4' here would
+      ! be exactly the weakening that ADR forbids -- the four reds would go
+      ! green while the defect stayed. #70 AC6 and #63 US38 need withdrawing
+      ! in the tracker.
       verdict = 'same'
     case default
       error stop 'shim_rule_table: unhandled rule kind'
