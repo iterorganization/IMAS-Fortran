@@ -25,9 +25,9 @@
 ! the DD 4 side. That is a legibility defect in a failure message rather than
 ! a wrong result, and it belongs to that test rather than this one.
 !
-! This is also why the loss log is a second channel rather than the only one:
-! a value comparison on its own distinguishes a served field from a refused
-! one, provided the shim-read column is the second argument.
+! This is also why the loss log file is a second channel rather than the only
+! one: a value comparison on its own distinguishes a served field from a
+! refused one, provided the shim-read column is the second argument.
 ! ---------------------------------------------------------------------------
 !
 ! A failing check names the rule that broke (id, kind and cited source), not

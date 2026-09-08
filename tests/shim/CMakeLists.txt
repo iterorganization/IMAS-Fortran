@@ -188,8 +188,8 @@ add_test(NAME al-fortran-test-shim-right-only-rules
 # docs/SHIM_INTEGRATION_CONTRACT.md section 7 says such a run writes a loss
 # file into IMAS_MVDD_LOSS_LOG_DIR -- or into the working directory when that
 # is unset, which would drop it in the build tree and leave it for whichever
-# test looks there next. This test asserts nothing about the loss log; it
-# points it somewhere private purely so it cannot be mistaken for another
+# test looks there next. This test asserts nothing about the loss log file;
+# it points it somewhere private purely so it cannot be mistaken for another
 # test's artifact. The directory has to exist before the run, hence
 # file(MAKE_DIRECTORY) at configure time.
 set(AL_SHIM_RIGHT_ONLY_LOSS_LOG_DIR "${CMAKE_CURRENT_BINARY_DIR}/right-only-loss-log")
@@ -209,7 +209,7 @@ set_tests_properties(al-fortran-test-shim-right-only-rules PROPERTIES
 # This test asserts the Fortran-side skip log, which is a different channel
 # from the shim's loss log file, but it still needs its own loss-log
 # directory: leaving IMAS_MVDD_LOSS_LOG_DIR unset is not neutral, because the
-# shim then writes the loss log into the current working directory.  Giving
+# shim then writes the loss log file into the current working directory.  Giving
 # it a directory of its own -- rather than the empty value the shim reads as
 # "disable" -- keeps the suite parallel-safe and leaves the channel there for
 # a later test to assert.  It is not cleaned before the run because nothing
