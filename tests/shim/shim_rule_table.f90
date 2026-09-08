@@ -122,6 +122,31 @@ module shim_rule_table
   integer, parameter, public :: rule_kind_retyped   = 8
   integer, parameter, public :: rule_kind_redefined = 9
 
+  ! Keep each kind's display name and expected verdict together.  Both
+  ! consumers below index this single table, so adding a kind cannot update
+  ! one mapping while silently leaving the other stale.
+  type :: rule_kind_definition
+    character(len=10) :: name
+    character(len=verdict_len) :: expected_verdict
+  end type rule_kind_definition
+
+  type(rule_kind_definition), parameter :: rule_kind_definitions(9) = [ &
+    rule_kind_definition('identical',  VERDICT_SAME), &
+    rule_kind_definition('renamed',    VERDICT_SAME), &
+    rule_kind_definition('moved',      VERDICT_SAME), &
+    rule_kind_definition('merged',     VERDICT_SAME), &
+    rule_kind_definition('split',      VERDICT_SAME), &
+    rule_kind_definition('cocos',      VERDICT_SAME), &
+    ! A right_only path has no DD 3 source, so only the DD 4 oracle has data.
+    rule_kind_definition('right_only', VERDICT_ONLY4), &
+    ! A retyped refusal is also absent only from the converted DD 3 read; the
+    ! test pairs this verdict with its named read-side skip-log entry.
+    rule_kind_definition('retyped',    VERDICT_ONLY4), &
+    ! Contract assertion: these redefined paths must be served even though
+    ! the shim refuses them today.  Issues #63/#72 override #70 AC6 here.
+    rule_kind_definition('redefined',  VERDICT_SAME) &
+  ]
+
   type, public :: rule_entry
     ! Wide enough for the longest map rule id in either table
     ! ("new-global-quantities-rho-tor-boundary", 38). A structure constructor
@@ -524,74 +549,23 @@ contains
     integer, intent(in) :: kind
     character(len=verdict_len) :: verdict
 
-    select case (kind)
-    case (rule_kind_identical, rule_kind_renamed, rule_kind_moved, rule_kind_merged, rule_kind_split, rule_kind_cocos)
-      verdict = VERDICT_SAME
-    case (rule_kind_right_only)
-      ! Same shape as the retyped case below and for a different reason: not
-      ! a refusal, but a path with no DD 3 source to serve from at all.  The
-      ! skip log therefore does not name these, so unlike a retyped refusal
-      ! the verdict is the whole assertion.
-      verdict = VERDICT_ONLY4
-    case (rule_kind_retyped)
-      ! What a refusal looks like through the comparison primitives: the
-      ! DD 4.1.1 control read holds the value and the shim's cross-version
-      ! read holds nothing.  That reads as 'only4' only when the control is
-      ! the first argument and the shim read the second, which is the order
-      ! test_shim_refusal_rules uses and states.
-      !
-      ! The verdict is half the assertion.  A field can also be absent
-      ! because the pulse never held it, so the refusal test pairs this
-      ! 'only4' with a named entry in the read-side skip log.
-      verdict = VERDICT_ONLY4
-    case (rule_kind_redefined)
-      ! Red by design: the shim refuses these today, so the observed verdict
-      ! is 'only4' and this expectation fails until the shim serves them.
-      ! Stated as the contract has it, not as the shim behaves.
-      !
-      ! Two tickets ask for opposite things here and this line follows one of
-      ! them deliberately. Issue #70 AC6 (and issue #63 US38) say "a quantity
-      ! whose unit the map records as redefined is asserted refused rather
-      ! than served", which would make this 'only4'. Issue #63's own rule
-      ! table and issue #72 say the four chi_squared paths must be asserted
-      ! as served, which makes it 'same'. The rule table wins: 'refused' is
-      ! what the shim does, and ADR 0002 says an assertion states the
-      ! contract rather than today's behaviour, so writing 'only4' here would
-      ! be exactly the weakening that ADR forbids -- the four reds would go
-      ! green while the defect stayed. #70 AC6 and #63 US38 need withdrawing
-      ! in the tracker.
-      verdict = VERDICT_SAME
-    case default
+    if (kind < lbound(rule_kind_definitions, 1) .or. &
+        kind > ubound(rule_kind_definitions, 1)) then
       error stop 'shim_rule_table: unhandled rule kind'
-    end select
+    end if
+    verdict = rule_kind_definitions(kind)%expected_verdict
   end function expected_verdict_for_kind
 
   function kind_name(kind) result(name)
     integer, intent(in) :: kind
     character(len=10) :: name
 
-    select case (kind)
-    case (rule_kind_identical)
-      name = 'identical'
-    case (rule_kind_renamed)
-      name = 'renamed'
-    case (rule_kind_moved)
-      name = 'moved'
-    case (rule_kind_merged)
-      name = 'merged'
-    case (rule_kind_split)
-      name = 'split'
-    case (rule_kind_retyped)
-      name = 'retyped'
-    case (rule_kind_redefined)
-      name = 'redefined'
-    case (rule_kind_cocos)
-      name = 'cocos'
-    case (rule_kind_right_only)
-      name = 'right_only'
-    case default
+    if (kind < lbound(rule_kind_definitions, 1) .or. &
+        kind > ubound(rule_kind_definitions, 1)) then
       name = 'unknown'
-    end select
+      return
+    end if
+    name = rule_kind_definitions(kind)%name
   end function kind_name
 
 end module shim_rule_table
