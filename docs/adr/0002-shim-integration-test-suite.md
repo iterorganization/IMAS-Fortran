@@ -65,7 +65,8 @@ This ADR records the reconciliation; it does not close it.
 
 - The suite is expected to have known contract-assertion failures on arrival,
   including the `chi_squared_{r,z}` paths under `x_point` and `strike_point`.
-  The later suite README will record the current red list and its causes.
+  The [suite README](../../tests/shim/README.md) records the current red list
+  and its causes.
 - Shim mode is not in CI. Adding it to CI requires revisiting this ADR first.
 - Tests are organized by conversion rule rather than by leaf: a rule is the
   unit that can be right or wrong, and its fidelity declaration is the oracle.
