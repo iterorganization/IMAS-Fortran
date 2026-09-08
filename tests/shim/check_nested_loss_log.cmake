@@ -1,8 +1,8 @@
 # Run a cross-DD HLI read and inspect its Tier-1 loss-log file.  This stays at
 # the HLI boundary: direct imas_mvdd_context_loss_* calls are a shim-repository
 # concern (ADR 0002), while the file is the only loss channel this binding owns.
-if( NOT DEFINED COMMAND_TO_RUN OR NOT DEFINED LOSS_LOG_DIR OR NOT DEFINED FIXTURE_ROOT )
-  message(FATAL_ERROR "SCENARIO-FAILURE: COMMAND_TO_RUN, LOSS_LOG_DIR and FIXTURE_ROOT are required")
+if( NOT DEFINED LOSS_LOG_DIR OR NOT DEFINED FIXTURE_ROOT )
+  message(FATAL_ERROR "SCENARIO-FAILURE: LOSS_LOG_DIR and FIXTURE_ROOT are required")
 endif()
 
 # Issue #66 asks that the checked-in fixture is byte-identical after a
@@ -31,21 +31,8 @@ if( _fixture_before STREQUAL "" )
   message(FATAL_ERROR "SCENARIO-FAILURE: no fixture files found under ${FIXTURE_ROOT}: the immutability check would pass vacuously")
 endif()
 
-file(MAKE_DIRECTORY "${LOSS_LOG_DIR}")
-file(GLOB _old_logs "${LOSS_LOG_DIR}/imas-mvdd-loss-*.txt")
-if( _old_logs )
-  file(REMOVE ${_old_logs})
-endif()
-
-execute_process(
-  COMMAND ${COMMAND_TO_RUN}
-  RESULT_VARIABLE _result
-  OUTPUT_VARIABLE _stdout
-  ERROR_VARIABLE _stderr
-)
-if( NOT _result EQUAL 0 )
-  message(FATAL_ERROR "SCENARIO-FAILURE: nested loss reader failed (${_result})\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/clean_loss_log_dir.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/run_scenario.cmake")
 
 fixture_digest(_fixture_after)
 if( NOT _fixture_after STREQUAL _fixture_before )

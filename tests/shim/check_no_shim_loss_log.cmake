@@ -5,25 +5,12 @@
 # SCENARIO names the scenario under test, so a failure here says which one
 # broke.  Its callers are not all stamp scenarios: al-fortran-test-shim-
 # version-unset runs through here too.
-if( NOT DEFINED COMMAND_TO_RUN OR NOT DEFINED LOSS_LOG_DIR OR NOT DEFINED SCENARIO )
-  message(FATAL_ERROR "SCENARIO-FAILURE: COMMAND_TO_RUN, LOSS_LOG_DIR and SCENARIO are required")
+if( NOT DEFINED LOSS_LOG_DIR )
+  message(FATAL_ERROR "SCENARIO-FAILURE: LOSS_LOG_DIR is required")
 endif()
 
-file(MAKE_DIRECTORY "${LOSS_LOG_DIR}")
-file(GLOB _old_logs "${LOSS_LOG_DIR}/imas-mvdd-loss-*.txt")
-if( _old_logs )
-  file(REMOVE ${_old_logs})
-endif()
-
-execute_process(
-  COMMAND ${COMMAND_TO_RUN}
-  RESULT_VARIABLE _result
-  OUTPUT_VARIABLE _stdout
-  ERROR_VARIABLE _stderr
-)
-if( NOT _result EQUAL 0 )
-  message(FATAL_ERROR "SCENARIO-FAILURE: ${SCENARIO} failed (${_result})\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/clean_loss_log_dir.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/run_scenario.cmake")
 
 file(GLOB _logs "${LOSS_LOG_DIR}/imas-mvdd-loss-*.txt")
 list(LENGTH _logs _log_count)

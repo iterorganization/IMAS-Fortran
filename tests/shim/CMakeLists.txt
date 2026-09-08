@@ -149,6 +149,7 @@ add_test(NAME al-fortran-test-shim-nested-loss
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-nested-loss>;${AL_SHIM_FIXTURE_ROOT}"
     -D "LOSS_LOG_DIR=${AL_SHIM_NESTED_LOSS_LOG_DIR}"
     -D "FIXTURE_ROOT=${AL_SHIM_FIXTURE_ROOT}"
+    -D "SCENARIO=al-fortran-test-shim-nested-loss"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_nested_loss_log.cmake"
 )
 set_tests_properties(al-fortran-test-shim-nested-loss PROPERTIES
@@ -334,6 +335,7 @@ add_test(NAME al-fortran-test-shim-torn-write
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-torn-write>;${AL_SHIM_TORN_WRITE_FIXTURE}"
     -D "EXPECTED_REFUSED_PATH=global_quantities/rho_tor_boundary"
+    -D "SCENARIO=al-fortran-test-shim-torn-write"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_torn_write.cmake"
 )
 set_tests_properties(al-fortran-test-shim-torn-write PROPERTIES
@@ -363,6 +365,7 @@ add_test(NAME al-fortran-test-shim-full-put-stamp
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-full-put-stamp>;${CMAKE_CURRENT_BINARY_DIR}/full-put-stamp-fixture"
     -D "EXPECTED_OUTPUT=REFUSED WRITE: 'ids_properties/version_put/data_dictionary'"
+    -D "SCENARIO=al-fortran-test-shim-full-put-stamp"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_full_put_stamp.cmake"
 )
 set_tests_properties(al-fortran-test-shim-full-put-stamp PROPERTIES

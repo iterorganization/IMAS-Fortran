@@ -6,8 +6,9 @@
 # of runs, and a test that does not assert on it still accumulates artifacts
 # under the build tree.  Both are avoided by starting every run from empty.
 #
-# Registered as a CTest fixture so it runs before the test that needs it,
-# rather than at configure time, which would only clean once per cmake.
+# Two ways in, both before the run and neither at configure time (configure
+# runs once, ctest runs many times): as a CTest fixture for a test that runs
+# its program directly, and by include() from a runner that wraps one.
 if( NOT DEFINED LOSS_LOG_DIR )
   message(FATAL_ERROR "LOSS_LOG_DIR is required")
 endif()
