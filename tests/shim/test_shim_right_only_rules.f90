@@ -40,12 +40,16 @@ program test_shim_right_only_rules
   use shim_rule_table, only: right_only_rules, structural_rules, &
                              expected_verdict_for_kind, rule_kind_right_only
   use shim_rule_check, only: rule_checker, verdicts_agree
+  use shim_run_guard, only: assert_ran_count
   implicit none
 
   type(ids_equilibrium) :: eq_cross, eq_control
   character(len=512) :: fixture_root
   integer :: status_cross, status_control
   integer :: demonstrations
+  ! Stated up front so a demonstration lost in an edit fails the run rather
+  ! than quietly shrinking it.  Raise it when adding one.
+  integer, parameter :: expected_demonstrations = 2
   type(rule_checker) :: checker
   logical :: has_cross, has_control
   real(ids_real), allocatable :: cross_values(:), control_values(:)
@@ -163,10 +167,8 @@ program test_shim_right_only_rules
 
   call checker%assert_every_rule_checked(checker%expectations)
 
-  if (demonstrations /= 2) then
-    write(*, '(a,i0,a)') 'RIGHT-ONLY-FAILURE: only ', demonstrations, ' of 2 demonstrations were run'
-    checker%failures = checker%failures + 1
-  end if
+  call assert_ran_count(checker%marker, 'demonstrations were run', &
+                        demonstrations, expected_demonstrations, checker%failures)
 
   if (checker%failures > 0) then
     write(*, '(a,i0,a)') 'RIGHT-ONLY-FAILURE: ', checker%failures, ' right_only rule(s) failed'

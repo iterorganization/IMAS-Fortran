@@ -65,6 +65,7 @@ program test_shim_refusal_rules
                                read_same_version
   use shim_comparison, only: verdict_real, verdict_integer
   use shim_rule_check, only: rule_checker
+  use shim_run_guard, only: assert_ran_count
   use shim_rule_table, only: refusal_rules, expected_verdict_for_kind, &
                              kind_name, retyped_refusal_reason, redefined_refusal_reason
   implicit none
@@ -187,8 +188,8 @@ program test_shim_refusal_rules
                        chi_squared_z_of(eq_cross%time_slice(1)%constraints%strike_point))
 
   ! -- Nothing here may pass by doing nothing. ---------------------------
-  call expect(expectations == expected_expectation_count, &
-              'every expectation in this program must run')
+  call assert_ran_count(checker%marker, 'expectations in this program ran', &
+                        expectations, expected_expectation_count, checker%failures)
 
   call checker%assert_every_rule_checked(rules_checked)
 

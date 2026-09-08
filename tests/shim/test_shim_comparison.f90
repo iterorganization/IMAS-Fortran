@@ -5,9 +5,13 @@ program test_shim_comparison
   use ids_routines, only: ids_real, ids_int, ids_int_invalid
   use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence, color_for_verdict
   use shim_comparison, only: verdict_real_vector_as_read, verdict_real_matrix_as_read
+  use shim_run_guard, only: assert_ran_count
   implicit none
 
   integer :: failures, expectations, index
+  ! Stated up front so a case lost in an edit fails the run rather than
+  ! quietly shrinking it.  Raise it when adding one.
+  integer, parameter :: expected_expectation_count = 32
   real(ids_real) :: absent_real, real_values(2), flipped_values(2), other_values(2), short_values(1)
   real(ids_real) :: empty_values(0)
   real(ids_real) :: real_matrix(2,2), flipped_matrix(2,2), other_matrix(2,2)
@@ -98,7 +102,8 @@ program test_shim_comparison
   call expect(verdict_real_matrix_as_read(real_matrix, tall_matrix) == 'same', &
               'a reshape preserving the element count is not distinguished')
 
-  call expect(expectations == 32, 'all synthetic verdict cases must run')
+  call assert_ran_count('COMPARISON-FAILURE', 'synthetic verdict cases ran', &
+                        expectations, expected_expectation_count, failures)
 
   if (failures > 0) then
     write(*, '(a,i0,a)') 'COMPARISON-FAILURE: ', failures, ' expectation(s) failed'
