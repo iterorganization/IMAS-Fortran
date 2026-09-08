@@ -36,7 +36,7 @@ program test_shim_right_only_rules
   use ids_routines, only: ids_equilibrium, ids_real
   use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
                                read_same_version, assert_reads_usable
-  use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector
+  use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence
   use shim_rule_table, only: right_only_rules, structural_rules, &
                              expected_verdict_for_kind, rule_kind_right_only
   use shim_rule_check, only: rule_checker, verdicts_agree
@@ -72,13 +72,13 @@ program test_shim_right_only_rules
   call gather_contour_nodes(eq_control, control_values, has_control)
   call gather_contour_nodes(eq_cross, cross_values, has_cross)
   call checker%check('new-contour-tree', combine([ &
-       verdict_real_vector(has_control, control_values, has_cross, cross_values), &
+       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values), &
        contour_edges_verdict(eq_control, eq_cross)]))
 
   call gather_j_parallel(eq_control, control_values, has_control)
   call gather_j_parallel(eq_cross, cross_values, has_cross)
   call checker%check('new-constraints-j-parallel', &
-       verdict_real_vector(has_control, control_values, has_cross, cross_values))
+       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values))
 
   ! `convergence/result` is an identifier structure whose only leaf in the
   ! map's two-path note is `index`; the shim serving nothing leaves it at the
@@ -124,7 +124,7 @@ program test_shim_right_only_rules
   call gather_p1d_psi_norm(eq_control, control_values, has_control)
   call gather_p1d_psi_norm(eq_cross, cross_values, has_cross)
   call checker%check('new-profiles-1d-psi-norm', &
-       verdict_real_vector(has_control, control_values, has_cross, cross_values))
+       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values))
 
   ! -------------------------------------------------------------------------
   ! The hole this closes, demonstrated rather than asserted in prose.
@@ -215,7 +215,7 @@ contains
 
     call gather_contour_edges(control, control_edges, control_has)
     call gather_contour_edges(cross, cross_edges, cross_has)
-    verdict = verdict_real_vector(control_has, control_edges, cross_has, cross_edges)
+    verdict = verdict_real_vector_with_stated_presence(control_has, control_edges, cross_has, cross_edges)
   end function contour_edges_verdict
 
   logical function has_time_slice(equilibrium)

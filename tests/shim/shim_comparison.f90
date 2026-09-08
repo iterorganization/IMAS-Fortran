@@ -10,8 +10,8 @@ module shim_comparison
 
   real(ids_real), parameter :: tolerance = 1.0e-9_ids_real
 
-  public :: verdict_real, verdict_integer, verdict_real_vector, color_for_verdict
-  public :: verdict_real_vector_by_size, verdict_real_matrix_by_size
+  public :: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence, color_for_verdict
+  public :: verdict_real_vector_as_read, verdict_real_matrix_as_read
 
 contains
 
@@ -93,25 +93,36 @@ contains
   ! verdict is `same`.  A rule whose quantity neither side served would pass as
   ! agreement.  Deriving presence here means no call site can claim a presence
   ! it has not checked.
-  function verdict_real_vector_by_size(left, right) result(verdict)
+  function verdict_real_vector_as_read(left, right) result(verdict)
     real(ids_real), intent(in) :: left(:), right(:)
     character(len=6) :: verdict
 
-    verdict = verdict_real_vector(size(left) > 0, left, size(right) > 0, right)
-  end function verdict_real_vector_by_size
+    verdict = verdict_real_vector_with_stated_presence(size(left) > 0, left, size(right) > 0, right)
+  end function verdict_real_vector_as_read
 
-  ! A 2-D quantity judged as its flattened elements.  The structural and COCOS
-  ! tests each carried a private copy of this; the extents still decide, so a
-  ! fold that changed the grid reports SHAPE rather than quietly comparing a
-  ! different number of points.
-  function verdict_real_matrix_by_size(left, right) result(verdict)
+  ! A 2-D quantity judged as its flattened elements, presence read off the
+  ! data as above.  The structural and COCOS tests each carried a private copy
+  ! of this.  The element count still decides, so a fold that changed the grid
+  ! reports SHAPE rather than quietly comparing a different number of points
+  ! -- but only the count survives the flatten, so a reshape that preserved it
+  ! would not be distinguished.  test_shim_comparison pins both.
+  function verdict_real_matrix_as_read(left, right) result(verdict)
     real(ids_real), intent(in) :: left(:,:), right(:,:)
     character(len=6) :: verdict
 
-    verdict = verdict_real_vector_by_size(reshape(left, [size(left)]), reshape(right, [size(right)]))
-  end function verdict_real_matrix_by_size
+    verdict = verdict_real_vector_as_read(reshape(left, [size(left)]), reshape(right, [size(right)]))
+  end function verdict_real_matrix_as_read
 
-  function verdict_real_vector(has_left, left, has_right, right) result(verdict)
+  ! Presence stated by the caller rather than read off the data, which is a
+  ! trap wherever the caller does not genuinely know: passing `.true.` for a
+  ! side the shim served nothing for makes two empty readings agree, for the
+  ! reason set out above verdict_real_vector_as_read.  Prefer that function.
+  !
+  ! Public because test_shim_comparison demonstrates the trap, and because a
+  ! caller that has checked presence some other way -- from the skip log, say
+  ! -- is entitled to say so.  The name is deliberately long enough that a
+  ! call site claiming a presence it has not established reads wrong.
+  function verdict_real_vector_with_stated_presence(has_left, left, has_right, right) result(verdict)
     logical, intent(in) :: has_left, has_right
     real(ids_real), intent(in) :: left(:), right(:)
     character(len=6) :: verdict
@@ -131,7 +142,7 @@ contains
     else
       verdict = 'DIFF'
     end if
-  end function verdict_real_vector
+  end function verdict_real_vector_with_stated_presence
 
   function color_for_verdict(verdict) result(color)
     character(len=*), intent(in) :: verdict

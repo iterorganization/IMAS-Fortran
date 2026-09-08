@@ -3,8 +3,8 @@
 ! driven here from literals with an independently stated expected result.
 program test_shim_comparison
   use ids_routines, only: ids_real, ids_int, ids_int_invalid
-  use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector, color_for_verdict
-  use shim_comparison, only: verdict_real_vector_by_size, verdict_real_matrix_by_size
+  use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence, color_for_verdict
+  use shim_comparison, only: verdict_real_vector_as_read, verdict_real_matrix_as_read
   implicit none
 
   integer :: failures, expectations, index
@@ -40,53 +40,53 @@ program test_shim_comparison
   call expect(verdict_integer(7_ids_int, absent_integer) == 'only4', 'right-absent integer is only4')
   call expect(verdict_integer(absent_integer, 7_ids_int) == 'only3', 'left-absent integer is only3')
   call expect(verdict_integer(absent_integer, absent_integer) == '--', 'both-absent integers are --')
-  call expect(verdict_real_vector(.true., real_values, .true., real_values) == 'same', &
+  call expect(verdict_real_vector_with_stated_presence(.true., real_values, .true., real_values) == 'same', &
               'equal vectors are same')
-  call expect(verdict_real_vector(.true., real_values, .true., flipped_values) == 'NOFLIP', &
+  call expect(verdict_real_vector_with_stated_presence(.true., real_values, .true., flipped_values) == 'NOFLIP', &
               'unflipped vectors are NOFLIP')
-  call expect(verdict_real_vector(.true., real_values, .true., other_values) == 'DIFF', &
+  call expect(verdict_real_vector_with_stated_presence(.true., real_values, .true., other_values) == 'DIFF', &
               'different vectors are DIFF')
-  call expect(verdict_real_vector(.true., real_values, .true., short_values) == 'SHAPE', &
+  call expect(verdict_real_vector_with_stated_presence(.true., real_values, .true., short_values) == 'SHAPE', &
               'different vector extents are SHAPE')
-  call expect(verdict_real_vector(.true., real_values, .false., short_values) == 'only4', &
+  call expect(verdict_real_vector_with_stated_presence(.true., real_values, .false., short_values) == 'only4', &
               'right-absent vector is only4')
-  call expect(verdict_real_vector(.false., short_values, .true., real_values) == 'only3', &
+  call expect(verdict_real_vector_with_stated_presence(.false., short_values, .true., real_values) == 'only3', &
               'left-absent vector is only3')
-  call expect(verdict_real_vector(.false., short_values, .false., short_values) == '--', &
+  call expect(verdict_real_vector_with_stated_presence(.false., short_values, .false., short_values) == '--', &
               'both-absent vectors are --')
   call expect(color_for_verdict('NOFLIP') == color_for_verdict('DIFF'), &
               'NOFLIP has mismatch severity')
 
-  ! The trap verdict_real_vector_by_size exists to close.  Asserting presence
+  ! The trap verdict_real_vector_as_read exists to close.  Asserting presence
   ! that was never checked -- `.true.` for a side the shim served nothing for --
   ! makes two empty readings agree, because equal extents send all_near into a
   ! loop that runs zero times and returns .true.
-  call expect(verdict_real_vector(.true., empty_values, .true., empty_values) == 'same', &
+  call expect(verdict_real_vector_with_stated_presence(.true., empty_values, .true., empty_values) == 'same', &
               'hardcoded presence makes two unserved vectors agree')
-  call expect(verdict_real_vector_by_size(empty_values, empty_values) == '--', &
+  call expect(verdict_real_vector_as_read(empty_values, empty_values) == '--', &
               'size-derived presence calls two unserved vectors absent')
-  call expect(verdict_real_vector_by_size(real_values, empty_values) == 'only4', &
+  call expect(verdict_real_vector_as_read(real_values, empty_values) == 'only4', &
               'size-derived presence calls an unserved right side only4')
-  call expect(verdict_real_vector_by_size(empty_values, real_values) == 'only3', &
+  call expect(verdict_real_vector_as_read(empty_values, real_values) == 'only3', &
               'size-derived presence calls an unserved left side only3')
-  call expect(verdict_real_vector_by_size(real_values, real_values) == 'same', &
+  call expect(verdict_real_vector_as_read(real_values, real_values) == 'same', &
               'size-derived presence still agrees on two served vectors')
 
-  ! verdict_real_matrix_by_size decides the 2-D structural and COCOS rules, so
+  ! verdict_real_matrix_as_read decides the 2-D structural and COCOS rules, so
   ! it is driven from literals here like every other verdict.
-  call expect(verdict_real_matrix_by_size(real_matrix, real_matrix) == 'same', &
+  call expect(verdict_real_matrix_as_read(real_matrix, real_matrix) == 'same', &
               'equal matrices are same')
-  call expect(verdict_real_matrix_by_size(real_matrix, flipped_matrix) == 'NOFLIP', &
+  call expect(verdict_real_matrix_as_read(real_matrix, flipped_matrix) == 'NOFLIP', &
               'unflipped matrices are NOFLIP')
-  call expect(verdict_real_matrix_by_size(real_matrix, other_matrix) == 'DIFF', &
+  call expect(verdict_real_matrix_as_read(real_matrix, other_matrix) == 'DIFF', &
               'different matrices are DIFF')
-  call expect(verdict_real_matrix_by_size(real_matrix, bigger_matrix) == 'SHAPE', &
+  call expect(verdict_real_matrix_as_read(real_matrix, bigger_matrix) == 'SHAPE', &
               'a different element count is SHAPE')
-  call expect(verdict_real_matrix_by_size(real_matrix, empty_matrix) == 'only4', &
+  call expect(verdict_real_matrix_as_read(real_matrix, empty_matrix) == 'only4', &
               'an unserved right matrix is only4')
-  call expect(verdict_real_matrix_by_size(empty_matrix, real_matrix) == 'only3', &
+  call expect(verdict_real_matrix_as_read(empty_matrix, real_matrix) == 'only3', &
               'an unserved left matrix is only3')
-  call expect(verdict_real_matrix_by_size(empty_matrix, empty_matrix) == '--', &
+  call expect(verdict_real_matrix_as_read(empty_matrix, empty_matrix) == '--', &
               'two unserved matrices are absent')
 
   ! The limit of judging a matrix by its flattened elements, pinned rather than
@@ -95,7 +95,7 @@ program test_shim_comparison
   ! table compares one fixture's grid against the other's, where a fold that
   ! changed the grid also changes the count -- but a fold that transposed it
   ! would not be caught here.
-  call expect(verdict_real_matrix_by_size(real_matrix, tall_matrix) == 'same', &
+  call expect(verdict_real_matrix_as_read(real_matrix, tall_matrix) == 'same', &
               'a reshape preserving the element count is not distinguished')
 
   call expect(expectations == 32, 'all synthetic verdict cases must run')

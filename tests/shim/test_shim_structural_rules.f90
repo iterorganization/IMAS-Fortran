@@ -15,7 +15,7 @@ program test_shim_structural_rules
   use ids_routines, only: ids_equilibrium, ids_real
   use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
                                read_same_version, assert_reads_usable
-  use shim_comparison, only: verdict_real, verdict_real_vector_by_size, verdict_real_matrix_by_size
+  use shim_comparison, only: verdict_real, verdict_real_vector_as_read, verdict_real_matrix_as_read
   use shim_rule_table, only: structural_rules
   use shim_rule_check, only: rule_checker
   implicit none
@@ -37,7 +37,7 @@ program test_shim_structural_rules
   call checker%check('identical-vacuum-r0', &
        verdict_real(eq_cross%vacuum_toroidal_field%r0, eq_control%vacuum_toroidal_field%r0))
   call checker%check('identical-time', &
-       verdict_real_vector_by_size(eq_cross%time, eq_control%time))
+       verdict_real_vector_as_read(eq_cross%time, eq_control%time))
   call checker%check('identical-beta-pol', &
        verdict_real(eq_cross%time_slice(1)%global_quantities%beta_pol, &
                     eq_control%time_slice(1)%global_quantities%beta_pol))
@@ -80,23 +80,23 @@ program test_shim_structural_rules
                               eq_control%time_slice(1)%boundary%gap(1)%z)))
 
   ! -- merged: the eight folds --
-  call checker%check('fold-p2d-br', verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%b_field_r, &
+  call checker%check('fold-p2d-br', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_r, &
                                              eq_control%time_slice(1)%profiles_2d(1)%b_field_r))
-  call checker%check('fold-p2d-bz', verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%b_field_z, &
+  call checker%check('fold-p2d-bz', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_z, &
                                              eq_control%time_slice(1)%profiles_2d(1)%b_field_z))
-  call checker%check('fold-p2d-bphi', verdict_real_matrix_by_size(eq_cross%time_slice(1)%profiles_2d(1)%b_field_phi, &
+  call checker%check('fold-p2d-bphi', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_phi, &
                                                eq_control%time_slice(1)%profiles_2d(1)%b_field_phi))
   call checker%check('fold-axis-bphi', &
        verdict_real(eq_cross%time_slice(1)%global_quantities%magnetic_axis%b_field_phi, &
                     eq_control%time_slice(1)%global_quantities%magnetic_axis%b_field_phi))
   call checker%check('fold-p1d-baverage', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%b_field_average, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_average, &
                                    eq_control%time_slice(1)%profiles_1d%b_field_average))
   call checker%check('fold-p1d-bmax', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%b_field_max, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_max, &
                                    eq_control%time_slice(1)%profiles_1d%b_field_max))
   call checker%check('fold-p1d-bmin', &
-       verdict_real_vector_by_size(eq_cross%time_slice(1)%profiles_1d%b_field_min, &
+       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_min, &
                                    eq_control%time_slice(1)%profiles_1d%b_field_min))
   call checker%check('fold-energy-mhd', &
        verdict_real(eq_cross%time_slice(1)%global_quantities%energy_mhd, &
