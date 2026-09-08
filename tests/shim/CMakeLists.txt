@@ -402,6 +402,7 @@ else()
         COMMAND ${CMAKE_COMMAND}
           -D "COMMAND_TO_RUN=$<TARGET_FILE:${target}>;${fixture}"
           -D "LOSS_LOG_DIR=${loss_log_dir}"
+          -D "SCENARIO=${target}"
           -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
       )
       set(environment
@@ -450,6 +451,7 @@ add_test(NAME al-fortran-test-shim-version-unset
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-version-unset>;${AL_SHIM_FIXTURE_ROOT}"
     -D "LOSS_LOG_DIR=${AL_SHIM_VERSION_UNSET_LOSS_LOG_DIR}"
+    -D "SCENARIO=al-fortran-test-shim-version-unset"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
 )
 # IMAS_MVDD_HLI_DD_VERSION is deliberately absent from this ENVIRONMENT: that
@@ -469,6 +471,7 @@ add_test(NAME al-fortran-test-shim-stamp-equal
   COMMAND ${CMAKE_COMMAND}
     -D "COMMAND_TO_RUN=$<TARGET_FILE:al-fortran-test-shim-stamp-equal>;${AL_SHIM_FIXTURE_ROOT}"
     -D "LOSS_LOG_DIR=${AL_SHIM_STAMP_EQUAL_LOSS_LOG_DIR}"
+    -D "SCENARIO=al-fortran-test-shim-stamp-equal"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_no_shim_loss_log.cmake"
 )
 set_tests_properties(al-fortran-test-shim-stamp-equal PROPERTIES
