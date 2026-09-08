@@ -4,12 +4,14 @@
 program test_shim_comparison
   use ids_routines, only: ids_real, ids_int, ids_int_invalid
   use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector, color_for_verdict
-  use shim_comparison, only: verdict_real_vector_by_size
+  use shim_comparison, only: verdict_real_vector_by_size, verdict_real_matrix_by_size
   implicit none
 
-  integer :: failures, expectations
+  integer :: failures, expectations, index
   real(ids_real) :: absent_real, real_values(2), flipped_values(2), other_values(2), short_values(1)
   real(ids_real) :: empty_values(0)
+  real(ids_real) :: real_matrix(2,2), flipped_matrix(2,2), other_matrix(2,2)
+  real(ids_real) :: bigger_matrix(2,3), tall_matrix(4,1), empty_matrix(0,0)
   integer(ids_int) :: absent_integer
 
   failures = 0
@@ -20,6 +22,11 @@ program test_shim_comparison
   flipped_values = [-1.0_ids_real, -2.0_ids_real]
   other_values = [1.0_ids_real, 3.0_ids_real]
   short_values = [1.0_ids_real]
+  real_matrix = reshape([1.0_ids_real, 2.0_ids_real, 3.0_ids_real, 4.0_ids_real], [2, 2])
+  flipped_matrix = -real_matrix
+  other_matrix = reshape([1.0_ids_real, 2.0_ids_real, 3.0_ids_real, 5.0_ids_real], [2, 2])
+  bigger_matrix = reshape([(real(index, ids_real), index = 1, 6)], [2, 3])
+  tall_matrix = reshape([1.0_ids_real, 2.0_ids_real, 3.0_ids_real, 4.0_ids_real], [4, 1])
 
   call expect(verdict_real(3.0_ids_real, 3.0_ids_real) == 'same', 'equal reals are same')
   call expect(verdict_real(3.0_ids_real, -3.0_ids_real) == 'NOFLIP', &
@@ -65,7 +72,33 @@ program test_shim_comparison
   call expect(verdict_real_vector_by_size(real_values, real_values) == 'same', &
               'size-derived presence still agrees on two served vectors')
 
-  call expect(expectations == 24, 'all synthetic verdict cases must run')
+  ! verdict_real_matrix_by_size decides the 2-D structural and COCOS rules, so
+  ! it is driven from literals here like every other verdict.
+  call expect(verdict_real_matrix_by_size(real_matrix, real_matrix) == 'same', &
+              'equal matrices are same')
+  call expect(verdict_real_matrix_by_size(real_matrix, flipped_matrix) == 'NOFLIP', &
+              'unflipped matrices are NOFLIP')
+  call expect(verdict_real_matrix_by_size(real_matrix, other_matrix) == 'DIFF', &
+              'different matrices are DIFF')
+  call expect(verdict_real_matrix_by_size(real_matrix, bigger_matrix) == 'SHAPE', &
+              'a different element count is SHAPE')
+  call expect(verdict_real_matrix_by_size(real_matrix, empty_matrix) == 'only4', &
+              'an unserved right matrix is only4')
+  call expect(verdict_real_matrix_by_size(empty_matrix, real_matrix) == 'only3', &
+              'an unserved left matrix is only3')
+  call expect(verdict_real_matrix_by_size(empty_matrix, empty_matrix) == '--', &
+              'two unserved matrices are absent')
+
+  ! The limit of judging a matrix by its flattened elements, pinned rather than
+  ! left to be discovered: only the element count survives the flatten, so a
+  ! 2x2 and a 4x1 holding the same four numbers agree.  Every 2-D rule in the
+  ! table compares one fixture's grid against the other's, where a fold that
+  ! changed the grid also changes the count -- but a fold that transposed it
+  ! would not be caught here.
+  call expect(verdict_real_matrix_by_size(real_matrix, tall_matrix) == 'same', &
+              'a reshape preserving the element count is not distinguished')
+
+  call expect(expectations == 32, 'all synthetic verdict cases must run')
 
   if (failures > 0) then
     write(*, '(a,i0,a)') 'COMPARISON-FAILURE: ', failures, ' expectation(s) failed'
