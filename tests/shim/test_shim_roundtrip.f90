@@ -15,7 +15,14 @@ program test_shim_roundtrip
   call get_command_argument(1, fixture)
   if (len_trim(fixture) == 0) error stop 'SCENARIO-FAILURE: missing roundtrip fixture'
   call get_command_argument(2, control)
-  require_clean_read = trim(control) == 'clean-read'
+  select case (trim(control))
+  case ('clean-read')
+    require_clean_read = .true.
+  case ('partial-read-allowed')
+    require_clean_read = .false.
+  case default
+    error stop 'SCENARIO-FAILURE: read control must be clean-read or partial-read-allowed'
+  end select
 
   ! `global_quantities/ip` is a mapped COCOS field, so the DD 3 case has to
   ! flip it on write and on read.  The generated slice writer needs a matching
