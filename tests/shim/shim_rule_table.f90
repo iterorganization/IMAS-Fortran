@@ -462,7 +462,7 @@ module shim_rule_table
   ! weakened to match observed behaviour: the four reds turn green by
   ! themselves when the shim serves these paths, with nobody having to
   ! remember to come back and flip an expectation. ADR 0002's Consequences
-  ! already lists these four among the suite's expected failures on arrival.
+  ! already lists these four as contract assertions known to be red on arrival.
   ! -------------------------------------------------------------------------
   integer, parameter, public :: refusal_rule_count = 5
 

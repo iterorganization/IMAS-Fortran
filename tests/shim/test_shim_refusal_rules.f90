@@ -50,7 +50,7 @@
 ! green while the defect stands, and someone would have to remember to come
 ! back and flip it. As written it turns green by itself when the shim is
 ! fixed. ADR 0002's Consequences already lists these four paths among the
-! suite's expected failures on arrival, and #72 tracks the fix.
+! suite's contract assertions known to be red on arrival, and #72 tracks the fix.
 !
 ! The `retyped` rule above them is the opposite case: its refusal is correct,
 ! because no value transformation reshapes an INT_1D into an array of
