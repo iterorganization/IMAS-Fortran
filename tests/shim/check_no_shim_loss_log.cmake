@@ -6,7 +6,7 @@
 # broke.  Its callers are not all stamp scenarios: al-fortran-test-shim-
 # version-unset runs through here too.
 if( NOT DEFINED COMMAND_TO_RUN OR NOT DEFINED LOSS_LOG_DIR OR NOT DEFINED SCENARIO )
-  message(FATAL_ERROR "COMMAND_TO_RUN, LOSS_LOG_DIR and SCENARIO are required")
+  message(FATAL_ERROR "SCENARIO-FAILURE: COMMAND_TO_RUN, LOSS_LOG_DIR and SCENARIO are required")
 endif()
 
 file(MAKE_DIRECTORY "${LOSS_LOG_DIR}")
@@ -22,11 +22,11 @@ execute_process(
   ERROR_VARIABLE _stderr
 )
 if( NOT _result EQUAL 0 )
-  message(FATAL_ERROR "${SCENARIO} failed (${_result})\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: ${SCENARIO} failed (${_result})\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
 endif()
 
 file(GLOB _logs "${LOSS_LOG_DIR}/imas-mvdd-loss-*.txt")
 list(LENGTH _logs _log_count)
 if( NOT _log_count EQUAL 0 )
-  message(FATAL_ERROR "${SCENARIO} logged loss despite plain forwarding/refusal: ${_logs}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: ${SCENARIO} logged loss despite plain forwarding/refusal: ${_logs}")
 endif()

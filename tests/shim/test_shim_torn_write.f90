@@ -21,7 +21,7 @@ program test_shim_torn_write
   integer :: context, status
 
   call get_command_argument(1, fixture)
-  if (len_trim(fixture) == 0) error stop 'missing torn-write fixture'
+  if (len_trim(fixture) == 0) error stop 'SCENARIO-FAILURE: missing torn-write fixture'
 
   written%ids_properties%homogeneous_time = 1
   allocate(written%time(1))
@@ -37,18 +37,18 @@ program test_shim_torn_write
   call ids_put_slice(context, 'equilibrium', written, status)
   if (status /= PARTIAL_PUT) then
     write(*, '(a,i0)') 'TORN-WRITE-FAILURE: right_only write status was ', status
-    error stop 'right_only write did not report PARTIAL_PUT'
+    error stop 'SCENARIO-FAILURE: right_only write did not report PARTIAL_PUT'
   end if
 
   call ids_get(context, 'equilibrium', read_back, status)
   call imas_close(context)
-  if (status < 0) error stop 'torn-write read failed'
-  if (.not. associated(read_back%time_slice)) error stop 'torn-write has no time slices'
+  if (status < 0) error stop 'SCENARIO-FAILURE: torn-write read failed'
+  if (.not. associated(read_back%time_slice)) error stop 'SCENARIO-FAILURE: torn-write has no time slices'
   ! The curated fixture has two slices.  The third is retained even though the
   ! right_only leaf was refused: this is the behaviour pin's torn shape.
-  if (size(read_back%time_slice) /= 3) error stop 'refusal did not leave a torn slice'
-  if (read_back%time_slice(3)%time /= expected_time) error stop 'torn slice lost its time'
+  if (size(read_back%time_slice) /= 3) error stop 'SCENARIO-FAILURE: refusal did not leave a torn slice'
+  if (read_back%time_slice(3)%time /= expected_time) error stop 'SCENARIO-FAILURE: torn slice lost its time'
   if (read_back%time_slice(3)%global_quantities%ip /= expected_ip) then
-    error stop 'leaf before refusal was not readable from the torn slice'
+    error stop 'SCENARIO-FAILURE: leaf before refusal was not readable from the torn slice'
   end if
 end program test_shim_torn_write

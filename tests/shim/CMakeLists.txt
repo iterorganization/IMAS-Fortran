@@ -154,6 +154,7 @@ add_test(NAME al-fortran-test-shim-nested-loss
 set_tests_properties(al-fortran-test-shim-nested-loss PROPERTIES
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_NESTED_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 # Structural rules (identical, renamed, moved, merged, split): each asserted
@@ -303,6 +304,7 @@ function(add_shim_roundtrip_test name fixture read_control)
     FIXTURES_REQUIRED ${test_name}
     ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
     LABELS "shim;contract-assertion"
+    FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
   )
 endfunction()
 
@@ -338,6 +340,7 @@ set_tests_properties(al-fortran-test-shim-torn-write PROPERTIES
   FIXTURES_REQUIRED al-fortran-test-shim-torn-write
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;behaviour-pin"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 # Unlike ids_put_slice, a full put visits the DD-version stamp.  Run this
@@ -366,6 +369,7 @@ set_tests_properties(al-fortran-test-shim-full-put-stamp PROPERTIES
   FIXTURES_REQUIRED al-fortran-test-shim-full-put-stamp
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 # A stamp is read while opening an occurrence, so these three states have to
@@ -447,6 +451,7 @@ else()
     set_tests_properties(${target} PROPERTIES
       ENVIRONMENT "${environment}"
       LABELS "shim;contract-assertion"
+      FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
     )
   endfunction()
 
@@ -493,6 +498,7 @@ add_test(NAME al-fortran-test-shim-version-unset
 set_tests_properties(al-fortran-test-shim-version-unset PROPERTIES
   ENVIRONMENT "IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_VERSION_UNSET_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )
 
 add_executable(al-fortran-test-shim-stamp-equal test_shim_stamp_equal.f90)
@@ -509,4 +515,5 @@ add_test(NAME al-fortran-test-shim-stamp-equal
 set_tests_properties(al-fortran-test-shim-stamp-equal PROPERTIES
   ENVIRONMENT "IMAS_MVDD_HLI_DD_VERSION=4.1.1;IMAS_MVDD_LOSS_LOG_DIR=${AL_SHIM_STAMP_EQUAL_LOSS_LOG_DIR};${AL_CORE_TEST_ENVIRONMENT}"
   LABELS "shim;contract-assertion"
+  FAIL_REGULAR_EXPRESSION "SCENARIO-FAILURE"
 )

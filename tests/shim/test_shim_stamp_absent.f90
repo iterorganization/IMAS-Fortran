@@ -11,16 +11,16 @@ program test_shim_stamp_absent
   integer :: context, open_status, get_status
 
   call get_command_argument(1, fixture)
-  if (len_trim(fixture) == 0) error stop 'missing stamp-absent fixture'
+  if (len_trim(fixture) == 0) error stop 'SCENARIO-FAILURE: missing stamp-absent fixture'
 
   call imas_open('imas:hdf5?path='//trim(fixture), OPEN_PULSE, context, open_status)
-  if (open_status /= 0) error stop 'stamp-absent occurrence open did not forward'
+  if (open_status /= 0) error stop 'SCENARIO-FAILURE: stamp-absent occurrence open did not forward'
 
   call ids_get(context, 'equilibrium', equilibrium, get_status)
   call imas_close(context)
 
-  if (get_status /= 0) error stop 'stamp-absent read did not forward cleanly'
-  if (al_get_skipped_count() /= 0) error stop 'stamp-absent read logged a skipped path'
-  if (.not. associated(equilibrium%time)) error stop 'stamp-absent read reached no data'
-  if (size(equilibrium%time) /= 2) error stop 'stamp-absent read returned an unexpected time base'
+  if (get_status /= 0) error stop 'SCENARIO-FAILURE: stamp-absent read did not forward cleanly'
+  if (al_get_skipped_count() /= 0) error stop 'SCENARIO-FAILURE: stamp-absent read logged a skipped path'
+  if (.not. associated(equilibrium%time)) error stop 'SCENARIO-FAILURE: stamp-absent read reached no data'
+  if (size(equilibrium%time) /= 2) error stop 'SCENARIO-FAILURE: stamp-absent read returned an unexpected time base'
 end program test_shim_stamp_absent

@@ -17,16 +17,16 @@ program test_shim_stamp_equal
   integer :: context, open_status, get_status
 
   call get_command_argument(1, fixture_root)
-  if (len_trim(fixture_root) == 0) error stop 'missing fixture root'
+  if (len_trim(fixture_root) == 0) error stop 'SCENARIO-FAILURE: missing fixture root'
 
   call imas_open('imas:hdf5?path='//trim(fixture_root)//'/dd-4.1.1', OPEN_PULSE, context, open_status)
-  if (open_status /= 0) error stop 'stamp-equal open did not forward'
+  if (open_status /= 0) error stop 'SCENARIO-FAILURE: stamp-equal open did not forward'
 
   call ids_get(context, 'equilibrium', equilibrium, get_status)
   call imas_close(context)
 
-  if (get_status /= 0) error stop 'stamp-equal read did not forward cleanly'
-  if (al_get_skipped_count() /= 0) error stop 'stamp-equal read logged a skipped path'
-  if (.not. associated(equilibrium%time)) error stop 'stamp-equal read reached no data'
-  if (size(equilibrium%time) /= 2) error stop 'stamp-equal read returned an unexpected time base'
+  if (get_status /= 0) error stop 'SCENARIO-FAILURE: stamp-equal read did not forward cleanly'
+  if (al_get_skipped_count() /= 0) error stop 'SCENARIO-FAILURE: stamp-equal read logged a skipped path'
+  if (.not. associated(equilibrium%time)) error stop 'SCENARIO-FAILURE: stamp-equal read reached no data'
+  if (size(equilibrium%time) /= 2) error stop 'SCENARIO-FAILURE: stamp-equal read returned an unexpected time base'
 end program test_shim_stamp_equal

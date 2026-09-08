@@ -20,16 +20,16 @@ program test_shim_stamp_malformed
   integer :: context, open_status
 
   call get_command_argument(1, fixture)
-  if (len_trim(fixture) == 0) error stop 'missing stamp-malformed fixture'
+  if (len_trim(fixture) == 0) error stop 'SCENARIO-FAILURE: missing stamp-malformed fixture'
 
   call imas_open('imas:hdf5?path='//trim(fixture), OPEN_PULSE, context, open_status, message)
-  if (.not. is_external_refusal(open_status)) error stop 'malformed stamp did not refuse at open'
-  if (.not. allocated(message)) error stop 'malformed stamp refusal supplied no reason'
-  if (index(message, 'malformed DD-version stamp') == 0) error stop 'malformed stamp refusal reason changed'
+  if (.not. is_external_refusal(open_status)) error stop 'SCENARIO-FAILURE: malformed stamp did not refuse at open'
+  if (.not. allocated(message)) error stop 'SCENARIO-FAILURE: malformed stamp refusal supplied no reason'
+  if (index(message, 'malformed DD-version stamp') == 0) error stop 'SCENARIO-FAILURE: malformed stamp refusal reason changed'
 
   ! The seam assertion.  This ran as `if (open_status == 0)` guarding an
   ! error stop, which the refusal asserted three lines above makes
   ! unreachable: a refusal is never status zero, so the branch could not
   ! execute and the requirement was never checked.
-  if (associated(equilibrium%time)) error stop 'malformed stamp forwarded to a data seam'
+  if (associated(equilibrium%time)) error stop 'SCENARIO-FAILURE: malformed stamp forwarded to a data seam'
 end program test_shim_stamp_malformed

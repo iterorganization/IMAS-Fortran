@@ -4,7 +4,7 @@
 # later Fortran assertion error-stopped.
 foreach(_var COMMAND_TO_RUN EXPECTED_OUTPUT)
   if(NOT DEFINED ${_var} OR "${${_var}}" STREQUAL "")
-    message(FATAL_ERROR "${_var} is required")
+    message(FATAL_ERROR "SCENARIO-FAILURE: ${_var} is required")
   endif()
 endforeach()
 
@@ -17,12 +17,12 @@ execute_process(
 set(command_output "${command_stdout}${command_stderr}")
 
 if(NOT command_result EQUAL 0)
-  message(FATAL_ERROR "full-put stamp assertion program failed:\n${command_output}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: full-put stamp assertion program failed:\n${command_output}")
 endif()
 
 string(FIND "${command_output}" "${EXPECTED_OUTPUT}" expected_output_position)
 if(expected_output_position EQUAL -1)
   message(FATAL_ERROR
-    "full put did not name the expected refused path '${EXPECTED_OUTPUT}':\n${command_output}"
+    "SCENARIO-FAILURE: full put did not name the expected refused path '${EXPECTED_OUTPUT}':\n${command_output}"
   )
 endif()

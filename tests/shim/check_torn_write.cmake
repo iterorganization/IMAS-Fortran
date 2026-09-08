@@ -2,7 +2,7 @@
 # the latter through its deliberately stable diagnostic until it gains a
 # read-side-like path accessor (follow-up requested by issue #74).
 if( NOT DEFINED COMMAND_TO_RUN OR NOT DEFINED EXPECTED_REFUSED_PATH )
-  message(FATAL_ERROR "COMMAND_TO_RUN and EXPECTED_REFUSED_PATH are required")
+  message(FATAL_ERROR "SCENARIO-FAILURE: COMMAND_TO_RUN and EXPECTED_REFUSED_PATH are required")
 endif()
 
 execute_process(
@@ -12,7 +12,7 @@ execute_process(
   ERROR_VARIABLE _stderr
 )
 if( NOT _result EQUAL 0 )
-  message(FATAL_ERROR "torn-write scenario failed (${_result})\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
+  message(FATAL_ERROR "SCENARIO-FAILURE: torn-write scenario failed (${_result})\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
 endif()
 
 # Do not merely accept any refused write: a traversal that dropped another
@@ -21,5 +21,5 @@ set(_expected_line "REFUSED WRITE: '${EXPECTED_REFUSED_PATH}'")
 string(FIND "${_stdout}" "${_expected_line}" _refusal_at)
 if( _refusal_at EQUAL -1 )
   message(FATAL_ERROR
-    "the write did not name ${EXPECTED_REFUSED_PATH} as refused\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
+    "SCENARIO-FAILURE: the write did not name ${EXPECTED_REFUSED_PATH} as refused\nstdout:\n${_stdout}\nstderr:\n${_stderr}")
 endif()
