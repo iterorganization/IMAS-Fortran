@@ -48,11 +48,9 @@
 ! fold-ggd-j, fold-ggd-bfield, fold-p1d-j, fold-p2d-j) whose only real DD3
 ! source is the deprecated `_tor` alias — imas-python-fixtures/README.md's
 ! own "Renames" table lists their targets alongside true renames for that
-! reason. Two of those five targets (profiles_1d/j_phi, profiles_2d/j_phi)
-! are themselves COCOS paths and are carried below as cocos rules, each
-! noting the fold it also rides on; the remaining three are not claimed by
-! any rule-table ticket today. That gap is noted here rather than silently
-! widening this table's scope to cover it.
+! reason. The profiles_1d/j_phi and profiles_2d/j_phi targets are also COCOS
+! paths and are carried below as COCOS rules, each noting the fold it rides
+! on; the other three are structural rules sampled at one child path each.
 !
 ! ------------------------------------------------------------ COCOS 11 -> 17
 !
@@ -158,7 +156,7 @@ module shim_rule_table
     character(len=200)  :: source
   end type rule_entry
 
-  integer, parameter, public :: structural_rule_count = 20
+  integer, parameter, public :: structural_rule_count = 23
 
   type(rule_entry), parameter, public :: structural_rules(structural_rule_count) = [ &
     ! -- identical: unclaimed paths falling through the map's own default rule --
@@ -197,7 +195,8 @@ module shim_rule_table
     rule_entry('move-gap', rule_kind_moved, &
       'time_slice/boundary/gap', &
       'map rule "move-gap"; fixtures README "Container and structure changes" row "boundary_separatrix/{...,gap}"'), &
-    ! -- merged: the eight folds where both DD3 spellings carry real data --
+    ! -- merged: folds where both DD3 spellings carry real data, plus three
+    !    whose only DD3 source is the deprecated `_tor` alias --
     rule_entry('fold-p2d-br', rule_kind_merged, &
       'time_slice/profiles_2d/b_field_r', &
       'map rule "fold-p2d-br"; fixtures README Folds "profiles_2d/b_r+b_field_r"'), &
@@ -232,6 +231,15 @@ module shim_rule_table
     rule_entry('fold-energy-mhd', rule_kind_merged, &
       'time_slice/global_quantities/energy_mhd', &
       'map rule "fold-energy-mhd"; fixtures README Folds "global_quantities/w_mhd+energy_mhd"'), &
+    rule_entry('fold-constraints-j', rule_kind_merged, &
+      'time_slice/constraints/j_phi', &
+      'map rule "fold-constraints-j"; fixtures README Renames/Folds "constraints/j_tor -> j_phi"'), &
+    rule_entry('fold-ggd-j', rule_kind_merged, &
+      'time_slice/ggd/j_phi', &
+      'map rule "fold-ggd-j"; fixtures README Renames/Folds "ggd/j_tor -> j_phi"'), &
+    rule_entry('fold-ggd-bfield', rule_kind_merged, &
+      'time_slice/ggd/b_field_phi', &
+      'map rule "fold-ggd-bfield"; fixtures README Renames/Folds "ggd/b_field_tor -> b_field_phi"'), &
     ! -- split: one rule, one DD3 source feeding two DD4 targets --
     rule_entry('split-psi-axis', rule_kind_split, &
       'time_slice/global_quantities/{psi_axis,psi_magnetic_axis}', &
