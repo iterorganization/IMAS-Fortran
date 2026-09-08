@@ -21,6 +21,14 @@ It has four deliberate boundaries:
   reverse direction requires a separate from-scratch 3.39.0 HLI build that this
   repository does not have. The resulting 23 unreachable `left_only` rules are
   an explicit coverage boundary.
+- **A rule is the unit, so a subtree rule is asserted on a sample of it.**
+  `new-contour-tree` is asserted on four of the ten paths the map counts and
+  `new-constraints-j-parallel` on three of thirteen. A `right_only` rule is
+  served or it is not, and the sampled leaves are enough to say which, so this
+  is the intended consequence of organising by rule rather than by leaf — but
+  a shim serving *part* of such a subtree would not be caught. Three `merged`
+  folds in the map (`fold-constraints-j`, `fold-ggd-j`, `fold-ggd-bfield`)
+  are claimed by no rule-table ticket at all and are asserted nowhere.
 - **Tier 1 only.** Tests use `ids_get` and `ids_put`, never the shim C ABI.
   C-ABI tests belong in the shim repository. `ids_get` owns and ends its action
   context, so Tier 1 cannot call `imas_mvdd_context_loss_*`; it reads the shim's
