@@ -26,6 +26,7 @@ program test_shim_cocos_rules
                                read_same_version, assert_reads_usable
   use ids_schemas_equilibrium, only: ids_equilibrium_constraints_0D_position
   use shim_comparison, only: verdict_real, verdict_real_vector_as_read, verdict_real_matrix_as_read
+  use shim_comparison, only: verdict_len, VERDICT_NOFLIP, presence_verdict
   use shim_rule_table, only: cocos_rules
   use shim_rule_check, only: rule_checker
   implicit none
@@ -179,22 +180,18 @@ contains
   ! size() alone gating the element access.
   function position_psi_verdict(cross, control) result(verdict)
     type(ids_equilibrium_constraints_0D_position), pointer, intent(in) :: cross(:), control(:)
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
     logical :: has_left, has_right
 
     has_left = associated(cross)
     if (has_left) has_left = size(cross) >= 1
     has_right = associated(control)
     if (has_right) has_right = size(control) >= 1
-    if (.not. has_left .and. .not. has_right) then
-      verdict = '--'
-    else if (.not. has_right) then
-      verdict = 'only4'
-    else if (.not. has_left) then
-      verdict = 'only3'
-    else
-      verdict = verdict_real(cross(1)%position%psi, control(1)%position%psi)
-    end if
+
+    verdict = presence_verdict(has_left, has_right)
+    if (verdict /= '') return
+
+    verdict = verdict_real(cross(1)%position%psi, control(1)%position%psi)
   end function position_psi_verdict
 
 
@@ -205,9 +202,9 @@ contains
   ! in the shared checker.
   subroutine check(id, verdict)
     character(len=*), intent(in) :: id
-    character(len=6), intent(in) :: verdict
+    character(len=verdict_len), intent(in) :: verdict
 
-    if (trim(verdict) == 'NOFLIP') then
+    if (trim(verdict) == trim(VERDICT_NOFLIP)) then
       call checker%check(id, verdict, 'the required COCOS sign flip did not happen')
     else
       call checker%check(id, verdict)

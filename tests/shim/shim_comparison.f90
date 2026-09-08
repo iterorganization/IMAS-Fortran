@@ -10,8 +10,27 @@ module shim_comparison
 
   real(ids_real), parameter :: tolerance = 1.0e-9_ids_real
 
+  ! The closed set of verdicts, named rather than spelled at each site.
+  !
+  ! CONTEXT.md names "verdict" as a domain concept, and it is one: seven
+  ! values, no others.  Carried as a fixed-width string because the failure
+  ! messages and the rule table print it, but a producer that spells one
+  ! wrong -- 'onlY4', 'Same' -- would not be caught by the comparison, which
+  ! is trim-equality, nor by color_for_verdict, which used to fall through to
+  ! a default colour.  Every site that produces a verdict now names one of
+  ! these, so a typo is a compile error instead.
+  integer, parameter, public :: verdict_len = 6
+  character(len=verdict_len), parameter, public :: VERDICT_ABSENT = '--'
+  character(len=verdict_len), parameter, public :: VERDICT_ONLY3  = 'only3'
+  character(len=verdict_len), parameter, public :: VERDICT_ONLY4  = 'only4'
+  character(len=verdict_len), parameter, public :: VERDICT_SAME   = 'same'
+  character(len=verdict_len), parameter, public :: VERDICT_NOFLIP = 'NOFLIP'
+  character(len=verdict_len), parameter, public :: VERDICT_DIFF   = 'DIFF'
+  character(len=verdict_len), parameter, public :: VERDICT_SHAPE  = 'SHAPE'
+
   public :: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence, color_for_verdict
   public :: verdict_real_vector_as_read, verdict_real_matrix_as_read
+  public :: presence_verdict
 
 contains
 
@@ -27,6 +46,28 @@ contains
     near = abs(left - right) <= tolerance * max(1.0_ids_real, abs(left), abs(right))
   end function near
 
+  ! The absent/only3/only4 cascade every verdict function opens with, written
+  ! once.  Returns blank when both sides are present, which is the caller's
+  ! signal to go on and judge the values.
+  !
+  ! `only4` is a statement about argument order as much as about the data: the
+  ! callers pass the DD 4 oracle first and the shim-served side second, so
+  ! `only4` reads "the oracle has a value and the shim served nothing".
+  function presence_verdict(has_left, has_right) result(verdict)
+    logical, intent(in) :: has_left, has_right
+    character(len=verdict_len) :: verdict
+
+    if (.not. has_left .and. .not. has_right) then
+      verdict = VERDICT_ABSENT
+    else if (.not. has_right) then
+      verdict = VERDICT_ONLY4
+    else if (.not. has_left) then
+      verdict = VERDICT_ONLY3
+    else
+      verdict = ''
+    end if
+  end function presence_verdict
+
   logical function all_near(left, right)
     real(ids_real), intent(in) :: left(:), right(:)
     integer :: index
@@ -41,45 +82,33 @@ contains
 
   function verdict_real(left, right) result(verdict)
     real(ids_real), intent(in) :: left, right
-    character(len=6) :: verdict
-    logical :: has_left, has_right
+    character(len=verdict_len) :: verdict
 
-    has_left = .not. is_absent_real(left)
-    has_right = .not. is_absent_real(right)
-    if (.not. has_left .and. .not. has_right) then
-      verdict = '--'
-    else if (.not. has_right) then
-      verdict = 'only4'
-    else if (.not. has_left) then
-      verdict = 'only3'
-    else if (near(left, right)) then
-      verdict = 'same'
+    verdict = presence_verdict(.not. is_absent_real(left), .not. is_absent_real(right))
+    if (verdict /= '') return
+
+    if (near(left, right)) then
+      verdict = VERDICT_SAME
     else if (near(left, -right)) then
       ! A COCOS conversion was expected to yield equal HLI values.  Opposite
       ! signs therefore mean its required flip did not happen.
-      verdict = 'NOFLIP'
+      verdict = VERDICT_NOFLIP
     else
-      verdict = 'DIFF'
+      verdict = VERDICT_DIFF
     end if
   end function verdict_real
 
   function verdict_integer(left, right) result(verdict)
     integer(ids_int), intent(in) :: left, right
-    character(len=6) :: verdict
-    logical :: has_left, has_right
+    character(len=verdict_len) :: verdict
 
-    has_left = left /= ids_int_invalid
-    has_right = right /= ids_int_invalid
-    if (.not. has_left .and. .not. has_right) then
-      verdict = '--'
-    else if (.not. has_right) then
-      verdict = 'only4'
-    else if (.not. has_left) then
-      verdict = 'only3'
-    else if (left == right) then
-      verdict = 'same'
+    verdict = presence_verdict(left /= ids_int_invalid, right /= ids_int_invalid)
+    if (verdict /= '') return
+
+    if (left == right) then
+      verdict = VERDICT_SAME
     else
-      verdict = 'DIFF'
+      verdict = VERDICT_DIFF
     end if
   end function verdict_integer
 
@@ -95,7 +124,7 @@ contains
   ! it has not checked.
   function verdict_real_vector_as_read(left, right) result(verdict)
     real(ids_real), intent(in) :: left(:), right(:)
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
 
     verdict = verdict_real_vector_with_stated_presence(size(left) > 0, left, size(right) > 0, right)
   end function verdict_real_vector_as_read
@@ -108,7 +137,7 @@ contains
   ! would not be distinguished.  test_shim_comparison pins both.
   function verdict_real_matrix_as_read(left, right) result(verdict)
     real(ids_real), intent(in) :: left(:,:), right(:,:)
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
 
     verdict = verdict_real_vector_as_read(reshape(left, [size(left)]), reshape(right, [size(right)]))
   end function verdict_real_matrix_as_read
@@ -125,22 +154,19 @@ contains
   function verdict_real_vector_with_stated_presence(has_left, left, has_right, right) result(verdict)
     logical, intent(in) :: has_left, has_right
     real(ids_real), intent(in) :: left(:), right(:)
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
 
-    if (.not. has_left .and. .not. has_right) then
-      verdict = '--'
-    else if (.not. has_right) then
-      verdict = 'only4'
-    else if (.not. has_left) then
-      verdict = 'only3'
-    else if (size(left) /= size(right)) then
-      verdict = 'SHAPE'
+    verdict = presence_verdict(has_left, has_right)
+    if (verdict /= '') return
+
+    if (size(left) /= size(right)) then
+      verdict = VERDICT_SHAPE
     else if (all_near(left, right)) then
-      verdict = 'same'
+      verdict = VERDICT_SAME
     else if (all_near(left, -right)) then
-      verdict = 'NOFLIP'
+      verdict = VERDICT_NOFLIP
     else
-      verdict = 'DIFF'
+      verdict = VERDICT_DIFF
     end if
   end function verdict_real_vector_with_stated_presence
 
@@ -151,20 +177,25 @@ contains
     character(len=*), parameter :: mismatch = escape//'[31m'
 
     select case (trim(verdict))
-    case ('same')
+    case (trim(VERDICT_SAME))
       color = escape//'[97m'
-    case ('NOFLIP', 'DIFF')
+    case (trim(VERDICT_NOFLIP), trim(VERDICT_DIFF))
       ! A missing required sign flip is a failed contract assertion, not a
       ! warning.  Keep it visually equivalent to an ordinary mismatch.
       color = mismatch
-    case ('SHAPE')
+    case (trim(VERDICT_SHAPE))
       color = escape//'[35m'
-    case ('only4')
+    case (trim(VERDICT_ONLY4))
       color = escape//'[36m'
-    case ('only3')
+    case (trim(VERDICT_ONLY3))
       color = escape//'[34m'
-    case default
+    case (trim(VERDICT_ABSENT))
       color = escape//'[90m'
+    case default
+      ! Not a colour choice: the verdict set is closed, so anything else is a
+      ! misspelling at a producer, and greying it out is how such a typo used
+      ! to reach a report looking like an ordinary absence.
+      error stop 'shim_comparison: unknown verdict in color_for_verdict'
     end select
   end function color_for_verdict
 

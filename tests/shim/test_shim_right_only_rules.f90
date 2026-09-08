@@ -37,6 +37,7 @@ program test_shim_right_only_rules
   use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
                                read_same_version, assert_reads_usable
   use shim_comparison, only: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence
+  use shim_comparison, only: verdict_len
   use shim_rule_table, only: right_only_rules, structural_rules, &
                              expected_verdict_for_kind, rule_kind_right_only
   use shim_rule_check, only: rule_checker, verdicts_agree
@@ -53,7 +54,7 @@ program test_shim_right_only_rules
   type(rule_checker) :: checker
   logical :: has_cross, has_control
   real(ids_real), allocatable :: cross_values(:), control_values(:)
-  character(len=6) :: served_nothing, agreement_expected
+  character(len=verdict_len) :: served_nothing, agreement_expected
 
   fixture_root = fixture_root_from_command()
   call read_cross_version(fixture_root, eq_cross, status_cross)
@@ -183,9 +184,9 @@ contains
   ! not meet the rule's expectation is the verdict reported, so the failure
   ! message names what actually went wrong rather than the expectation.
   function combine(verdicts) result(combined)
-    character(len=6), intent(in) :: verdicts(:)
-    character(len=6) :: combined
-    character(len=6) :: expected
+    character(len=verdict_len), intent(in) :: verdicts(:)
+    character(len=verdict_len) :: combined
+    character(len=verdict_len) :: expected
     integer :: leaf
 
     expected = expected_verdict_for_kind(rule_kind_right_only)
@@ -211,7 +212,7 @@ contains
   ! sample, and a shim serving part of a subtree would not be caught here.
   function contour_edges_verdict(control, cross) result(verdict)
     type(ids_equilibrium), intent(in) :: control, cross
-    character(len=6) :: verdict
+    character(len=verdict_len) :: verdict
     real(ids_real), allocatable :: control_edges(:), cross_edges(:)
     logical :: control_has, cross_has
 

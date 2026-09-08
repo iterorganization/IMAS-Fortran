@@ -18,6 +18,7 @@
 ! this type has no business knowing about.
 module shim_rule_check
   use shim_rule_table, only: rule_entry, expected_verdict_for_kind, kind_name
+  use shim_comparison, only: verdict_len
   use shim_run_guard, only: assert_ran_count
   implicit none
   private
@@ -74,7 +75,7 @@ contains
   function checker_expected_for(self, id) result(expected)
     class(rule_checker), intent(in) :: self
     character(len=*), intent(in) :: id
-    character(len=6) :: expected
+    character(len=verdict_len) :: expected
 
     expected = expected_verdict_for_kind(self%rules(self%find(id))%kind)
   end function checker_expected_for
@@ -89,7 +90,7 @@ contains
     character(len=*), intent(in) :: verdict
     character(len=*), intent(in), optional :: note
     integer :: idx
-    character(len=6) :: expected
+    character(len=verdict_len) :: expected
 
     idx = self%find(id)
     expected = expected_verdict_for_kind(self%rules(idx)%kind)

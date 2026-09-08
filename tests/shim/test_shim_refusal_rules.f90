@@ -63,7 +63,7 @@ program test_shim_refusal_rules
                            AL_SKIP_PATH_LEN, AL_SKIP_LOG_CAPACITY
   use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
                                read_same_version
-  use shim_comparison, only: verdict_real, verdict_integer
+  use shim_comparison, only: verdict_real, verdict_integer, verdict_len
   use shim_rule_check, only: rule_checker
   use shim_run_guard, only: assert_ran_count
   use shim_rule_table, only: refusal_rules, expected_verdict_for_kind, &
@@ -380,7 +380,7 @@ contains
   ! and report the rule rather than the field when they differ.
   subroutine check_rule(id, verdict)
     character(len=*), intent(in) :: id
-    character(len=6), intent(in) :: verdict
+    character(len=verdict_len), intent(in) :: verdict
 
     rules_checked = rules_checked + 1
     call checker%check(id, verdict)

@@ -16,6 +16,7 @@ program test_shim_structural_rules
   use shim_fixture_pair, only: fixture_root_from_command, read_cross_version, &
                                read_same_version, assert_reads_usable
   use shim_comparison, only: verdict_real, verdict_real_vector_as_read, verdict_real_matrix_as_read
+  use shim_comparison, only: verdict_len
   use shim_rule_table, only: structural_rules
   use shim_rule_check, only: rule_checker
   implicit none
@@ -130,8 +131,8 @@ contains
   ! else.  test_shim_right_only_rules derives it for the same reason.
   function combine_pair(id, first, second) result(combined)
     character(len=*), intent(in) :: id
-    character(len=6), intent(in) :: first, second
-    character(len=6) :: combined, expected
+    character(len=verdict_len), intent(in) :: first, second
+    character(len=verdict_len) :: combined, expected
 
     expected = checker%expected_for(id)
     if (trim(first) /= trim(expected)) then
