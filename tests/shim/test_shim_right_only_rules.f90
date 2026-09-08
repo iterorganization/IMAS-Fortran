@@ -241,22 +241,35 @@ contains
   ! `DIFF` or `SHAPE` rather than `only4`. The rule would still fail, and its
   ! verdict would still name the disagreement — but it would not name it as a
   ! served-nothing reading.
+  ! The reading a gather_* starts from and keeps if its container was never
+  ! served: absent, and a zero-length array rather than an unallocated one, so
+  ! a caller may pass it to the comparison primitives without checking first.
+  !
+  ! Every gather_* below opens with this and returns early, which is what
+  ! makes the four of them say only what differs -- which container they probe
+  ! and how they flatten it.  Assigning to an allocatable reallocates it, so
+  ! the served path needs no deallocate.
+  subroutine gather_nothing(values, is_present)
+    real(ids_real), allocatable, intent(out) :: values(:)
+    logical, intent(out) :: is_present
+
+    is_present = .false.
+    allocate(values(0))
+  end subroutine gather_nothing
+
   subroutine gather_contour_nodes(equilibrium, values, is_present)
     type(ids_equilibrium), intent(in) :: equilibrium
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%contour_tree%node)) then
-      is_present = size(equilibrium%time_slice(1)%contour_tree%node) > 0
-    end if
-    if (is_present) then
-      values = [equilibrium%time_slice(1)%contour_tree%node(:)%psi, &
-                equilibrium%time_slice(1)%contour_tree%node(:)%r,   &
-                equilibrium%time_slice(1)%contour_tree%node(:)%z]
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%contour_tree%node)) return
+    if (size(equilibrium%time_slice(1)%contour_tree%node) == 0) return
+
+    is_present = .true.
+    values = [equilibrium%time_slice(1)%contour_tree%node(:)%psi, &
+              equilibrium%time_slice(1)%contour_tree%node(:)%r,   &
+              equilibrium%time_slice(1)%contour_tree%node(:)%z]
   end subroutine gather_contour_nodes
 
   subroutine gather_contour_edges(equilibrium, values, is_present)
@@ -264,16 +277,13 @@ contains
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%contour_tree%edges)) then
-      is_present = size(equilibrium%time_slice(1)%contour_tree%edges) > 0
-    end if
-    if (is_present) then
-      values = real(reshape(equilibrium%time_slice(1)%contour_tree%edges, &
-                            [size(equilibrium%time_slice(1)%contour_tree%edges)]), ids_real)
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%contour_tree%edges)) return
+    if (size(equilibrium%time_slice(1)%contour_tree%edges) == 0) return
+
+    is_present = .true.
+    values = real(reshape(equilibrium%time_slice(1)%contour_tree%edges, &
+                          [size(equilibrium%time_slice(1)%contour_tree%edges)]), ids_real)
   end subroutine gather_contour_edges
 
   subroutine gather_j_parallel(equilibrium, values, is_present)
@@ -281,17 +291,14 @@ contains
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%constraints%j_parallel)) then
-      is_present = size(equilibrium%time_slice(1)%constraints%j_parallel) > 0
-    end if
-    if (is_present) then
-      values = [equilibrium%time_slice(1)%constraints%j_parallel(:)%measured,      &
-                equilibrium%time_slice(1)%constraints%j_parallel(:)%reconstructed, &
-                equilibrium%time_slice(1)%constraints%j_parallel(:)%position%psi]
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%constraints%j_parallel)) return
+    if (size(equilibrium%time_slice(1)%constraints%j_parallel) == 0) return
+
+    is_present = .true.
+    values = [equilibrium%time_slice(1)%constraints%j_parallel(:)%measured,      &
+              equilibrium%time_slice(1)%constraints%j_parallel(:)%reconstructed, &
+              equilibrium%time_slice(1)%constraints%j_parallel(:)%position%psi]
   end subroutine gather_j_parallel
 
   subroutine gather_p1d_psi_norm(equilibrium, values, is_present)
@@ -299,15 +306,12 @@ contains
     real(ids_real), allocatable, intent(out) :: values(:)
     logical, intent(out) :: is_present
 
-    is_present = .false.
-    if (associated(equilibrium%time_slice(1)%profiles_1d%psi_norm)) then
-      is_present = size(equilibrium%time_slice(1)%profiles_1d%psi_norm) > 0
-    end if
-    if (is_present) then
-      values = equilibrium%time_slice(1)%profiles_1d%psi_norm
-    else
-      allocate(values(0))
-    end if
+    call gather_nothing(values, is_present)
+    if (.not. associated(equilibrium%time_slice(1)%profiles_1d%psi_norm)) return
+    if (size(equilibrium%time_slice(1)%profiles_1d%psi_norm) == 0) return
+
+    is_present = .true.
+    values = equilibrium%time_slice(1)%profiles_1d%psi_norm
   end subroutine gather_p1d_psi_norm
 
 
