@@ -378,3 +378,179 @@ Both are ctest tests (`playground-play_eq_two_dd-self` / `-cross`). To see the
 original memory fault, revert the `else` arm of `al_begin_arraystruct_action` in
 `mode="GET_FIELD"` and rebuild -- the whole library regenerates, so this is a
 full rebuild.
+
+---
+
+# What a shim-linked *write* shows: the delete traversal was deaf
+
+**Status (2026-09-09): the Fortran half is fixed** in `IDSDef2F90Routines.xsl`
+and `wrapper/al_put_policy.f90`. The other half is a shim defect and is not
+fixable here; it is stated at the end so it can be routed as its own ticket.
+
+The scenario is `tests/shim/test_shim_full_put_stamp.f90`: a DD 3.39.0 pulse is
+opened through a DD 4.1.1 HLI and given a full `ids_put`. `ids_put` opens by
+deleting the previous occurrence, and that delete reaches
+`ids_properties/version_put/data_dictionary`.
+
+## The trigger
+
+The shim refuses the stamp delete, correctly and loudly:
+
+```
+IMAS-MVDD: this delete would remove the DD-version stamp while stored data
+remains; DD path: ids_properties/version_put/data_dictionary
+```
+
+Removing a stamp while data remains would leave a pulse holding numbers no
+reader can date, so refusing is right (`docs/SHIM_INTEGRATION_CONTRACT.md`
+section 6).
+
+## The defect
+
+The HLI never heard it. Three independent reasons, all in generated code:
+
+| Generator site | What was there |
+|---|---|
+| `IDSDef2F90Routines.xsl` `match="IDS" mode="delete"` | `subroutine ids_delete_<name>(pulsectx, IDSpath, IDS)` -- no `retstatus` argument at all, so the routine had nothing to report through |
+| the `mode="DELETE"` field template | its only emission was `call al_delete_data(opctx, <path>, status)`, and `status` was never read at any site |
+| `ids_put`'s `call ids_delete(pulsectx, name, IDS)` | called without a status, and `call al_reset_refused_writes()` came *after* it, so even a recorded refusal would have been zeroed before the derivation |
+
+So a *tolerated refusal* never became a *partial outcome*, and a put whose
+stale data was never removed returned 0. That is the one combination
+`al_put_policy` exists to prevent -- tolerance without a record -- applied to a
+whole phase of the operation rather than to one field.
+
+Measured on the 82-IDS generated tree, before the change:
+
+```
+generated *_delete.f90 files                82
+al_delete_data call sites                 7757   (every one discarded status)
+delete subroutines carrying retstatus        0  of 82
+```
+
+## What the fix had to decide
+
+Four things, none of them a matter of correcting an obvious slip.
+
+**1. Is a refused delete the same event as a refused write?** No -- a second
+counter, `al_refused_delete_total`. A refused write drops a value the caller
+supplied; a refused delete leaves behind one they did not, so an occurrence can
+be complete and correct in everything the caller sent and still not be what
+they asked for. A reader seeing the write-side wording would go looking for a
+value of their own that went missing and find none. `ids_delete` is also a
+public entry point in its own right, and one shared counter would make a
+standalone delete's report depend on whatever put ran before it.
+
+**2. Optional argument or new routine?** Optional. `ids_delete` gained
+`retstatus`, `intent(out), optional`, on the generic interface across all 82
+IDSs. Every existing caller keeps compiling unchanged, and it matches the shape
+`ids_put` and `ids_get` already have.
+
+**3. Where does the reset go?** Nowhere new. `al_reset_refused_writes()` stays
+exactly where it was, after the delete, so what "one operation" means for the
+write counter is unchanged. The delete counter is reset by `ids_delete` itself,
+at the top of its own traversal -- the phase that owns it. `ids_put` reads
+`al_get_refused_delete_count()` at the end and derives `PARTIAL_PUT` from
+either counter being non-zero, which is what CONTEXT.md's *partial outcome*
+asks: refusals during the operation the caller asked for, delete included.
+
+`ids_put_slice` was deliberately left alone. It has no delete phase -- its
+generated body for the stamp field is empty, so it never reaches the path at
+all -- and when it delegates to a full `ids_put` it returns that routine's
+status, derived there.
+
+**4. Is tolerating consistent with `ids_delete`'s `STOP`?** The refusal at
+`al_begin_global_action` is *not* tolerated, and must not be: both policy
+modules name that seam as barred, because tolerating it runs the traversal
+against an occurrence that was never opened. It is now *reported* instead of
+fatal wherever the caller asked for a status -- `ids_delete` STOPs only when
+called without `retstatus`, and `ids_put` propagates it and returns rather than
+writing into an occurrence whose previous contents are entirely intact. Before,
+a refusal at that seam took the calling program down.
+
+Per-site, only `is_external_refusal(status)` is recorded. Every other non-zero
+status is discarded exactly as before: this traversal deletes all 7757 paths of
+the IDS whether or not the occurrence holds them, so an ordinary not-found is
+the normal case and has always been ignored. Changing *that* is a separate
+question from making a refusal visible.
+
+## Blast radius, measured
+
+The generator was run standalone against both stylesheets and the trees
+diffed, rather than inferred:
+
+```
+files differing        164
+  *_delete.f90          82   (retstatus, the reset, the per-IDS wrapper)
+  *_put.f90             82   (the delete status, and the derivation)
+  everything else        0   no *_put_slice, *_get, *_validate or *_schema change
+al_delete_data sites   7757 -> all routed through delete_field_<ids>
+delete routines with retstatus   0 -> 82
+```
+
+The per-site emission is a call to one generated-per-IDS wrapper,
+`delete_field_<ids>`, rather than two statements inlined at each of the 7757
+sites: it keeps one line and one path literal per site. It is named per IDS
+because `ids_routines` uses all 82 delete modules in a single scope.
+
+## The other half, which is not ours: the stamp is silently overwritten
+
+**This is a shim defect. It needs its own ticket against
+IMAS-Multiversion-DD-Loader; do not chase it here.**
+
+The delete is refused. The `put_string(..., "4.1.1")` that follows it is *not*.
+Measured against a pristine copy of `imas-python-fixtures/fixtures/dd-3.39.0`:
+
+```
+stamp before ids_put : 3.39.0
+stamp after  ids_put : 4.1.1
+only refusal emitted : the delete one, quoted above
+```
+
+The pulse then advertises DD 4.1.1 while holding DD 3.39.0 data, so every later
+open reads it with no conversion at all and the conversion silently disappears.
+
+The shim already declares the check that should have stopped it. In
+`src/conversion/path_conversion.rs`, `DD_VERSION_STAMP` is
+`ids_properties/version_put/data_dictionary`, `WRITE_CHECKS` contains
+`WriteCheck::ImmutableStamp` (ADR 0016 decision 5), and `write_check_refusal`
+returns *"the DD-version stamp is immutable under a version mismatch"* for
+exactly that path. That refusal never appears. The delete-side twin, reading
+`DD_VERSION_STAMP_ANCESTRY`, *does* fire on the same path in the same
+operation, so the joined DD path is right at the delete seam. That the write
+seam does not run its checks for this path is a **hypothesis**; the three lines
+of measurement above are not.
+
+## Consequence for the test, stated so nobody reverts a correct fix
+
+`al-fortran-test-shim-full-put-stamp` stays red, and that is correct. Both
+remaining reasons are the shim defect above, not this one.
+
+Worth being precise about, because it is easy to read this fix as the thing
+that turns the test green, and it is not. The scenario was written around the
+*write* refusal, not the delete: its ctest wrapper asserts
+
+```
+EXPECTED_OUTPUT=REFUSED WRITE: 'ids_properties/version_put/data_dictionary'
+```
+
+on the program's output, which is a line only `al_note_refused_write` prints.
+That line never appears, for the same reason the stamp gets overwritten. So the
+scenario failed at two independent places before this fix and still fails at
+two after it: the stamp-write assertion, and the final check that the stored
+stamp still reads `3.39.0`.
+
+The fix does change what the *status* assertion proves, and the test was
+adjusted to keep it honest. `PARTIAL_PUT` used to be reachable only from a
+refused write, because a refused delete was invisible; now either phase
+produces it, so a status assertion on its own would be satisfied by the delete
+refusal while the write refusal the contract demands never happened. The
+program therefore asserts each phase on its own counter --
+`al_get_refused_delete_count()` and `al_get_refused_write_count()` -- and the
+status as the derived summary it is. The delete half is green with this fix;
+the write half is red on the shim.
+
+That is the shape to keep: this fix makes a previously invisible refusal
+visible and pins it with an assertion, and it removes one of the two Fortran
+defects behind the scenario. The scenario turns green by itself once the shim
+stops rewriting the stamp.
