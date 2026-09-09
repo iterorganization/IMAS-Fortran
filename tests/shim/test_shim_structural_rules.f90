@@ -8,6 +8,17 @@
 ! the independently-authored expected result of converting the first, so
 ! comparing against it needs no value literals transcribed into Fortran.
 !
+! Every comparison below names its two sides -- `oracle=` for the DD 4.1.1
+! control read, `converted=` for the shim-served one -- because `only3` and
+! `only4` say which side was absent and are therefore only as trustworthy as
+! that naming.  This program used to hand the shim-served reading over first
+! for every rule it checks, so each of its served-nothing readings reported
+! `only3` where the module's own vocabulary calls that situation `only4`; the
+! four rules that are red here were consequently written up as reporting
+! "a value on the DD 3 side only" when the value was in fact on the DD 4 side.
+! shim_comparison now refuses a positional call outright, so the naming is
+! checked by the compiler rather than by a reader counting arguments.
+!
 ! A failing check below names the rule that broke (id, kind and cited
 ! source), not only the field, per the suite's design (docs/adr/0002 and
 ! issue #63's acceptance criteria for this ticket).
@@ -38,89 +49,93 @@ program test_shim_structural_rules
 
   ! -- identical --
   call checker%check('identical-vacuum-r0', &
-       verdict_real(eq_cross%vacuum_toroidal_field%r0, eq_control%vacuum_toroidal_field%r0))
+       verdict_real(oracle = eq_control%vacuum_toroidal_field%r0, &
+                    converted = eq_cross%vacuum_toroidal_field%r0))
   call checker%check('identical-time', &
-       verdict_real_vector_as_read(eq_cross%time, eq_control%time))
+       verdict_real_vector_as_read(oracle = eq_control%time, converted = eq_cross%time))
   call checker%check('identical-beta-pol', &
-       verdict_real(eq_cross%time_slice(1)%global_quantities%beta_pol, &
-                    eq_control%time_slice(1)%global_quantities%beta_pol))
+       verdict_real(oracle = eq_control%time_slice(1)%global_quantities%beta_pol, &
+                    converted = eq_cross%time_slice(1)%global_quantities%beta_pol))
 
   ! -- renamed --
   call checker%check('rename-beta-normal', &
-       verdict_real(eq_cross%time_slice(1)%global_quantities%beta_tor_norm, &
-                    eq_control%time_slice(1)%global_quantities%beta_tor_norm))
+       verdict_real(oracle = eq_control%time_slice(1)%global_quantities%beta_tor_norm, &
+                    converted = eq_cross%time_slice(1)%global_quantities%beta_tor_norm))
   call checker%check('rename-bpol-probe', &
-       verdict_real(eq_cross%time_slice(1)%constraints%b_field_pol_probe(1)%measured, &
-                    eq_control%time_slice(1)%constraints%b_field_pol_probe(1)%measured))
+       verdict_real(oracle = eq_control%time_slice(1)%constraints%b_field_pol_probe(1)%measured, &
+                    converted = eq_cross%time_slice(1)%constraints%b_field_pol_probe(1)%measured))
   call checker%check('rename-mse-polarisation-angle', &
-       verdict_real(eq_cross%time_slice(1)%constraints%mse_polarization_angle(1)%measured, &
-                    eq_control%time_slice(1)%constraints%mse_polarization_angle(1)%measured))
+       verdict_real(oracle = eq_control%time_slice(1)%constraints%mse_polarization_angle(1)%measured, &
+                    converted = eq_cross%time_slice(1)%constraints%mse_polarization_angle(1)%measured))
   call checker%check('rename-magnetisation-r', &
-       verdict_real(eq_cross%time_slice(1)%constraints%iron_core_segment(1)%magnetization_r%measured, &
-                    eq_control%time_slice(1)%constraints%iron_core_segment(1)%magnetization_r%measured))
+       verdict_real(oracle = eq_control%time_slice(1)%constraints%iron_core_segment(1)%magnetization_r%measured, &
+                    converted = eq_cross%time_slice(1)%constraints%iron_core_segment(1)%magnetization_r%measured))
   call checker%check('rename-magnetisation-z', &
-       verdict_real(eq_cross%time_slice(1)%constraints%iron_core_segment(1)%magnetization_z%measured, &
-                    eq_control%time_slice(1)%constraints%iron_core_segment(1)%magnetization_z%measured))
+       verdict_real(oracle = eq_control%time_slice(1)%constraints%iron_core_segment(1)%magnetization_z%measured, &
+                    converted = eq_cross%time_slice(1)%constraints%iron_core_segment(1)%magnetization_z%measured))
 
   ! -- moved (each rule combines a r/z pair into one verdict) --
   call checker%check('move-closest-wall-point', &
        combine_pair('move-closest-wall-point', &
-                verdict_real(eq_cross%time_slice(1)%boundary%closest_wall_point%r, &
-                              eq_control%time_slice(1)%boundary%closest_wall_point%r), &
-                verdict_real(eq_cross%time_slice(1)%boundary%closest_wall_point%z, &
-                              eq_control%time_slice(1)%boundary%closest_wall_point%z)))
+                verdict_real(oracle = eq_control%time_slice(1)%boundary%closest_wall_point%r, &
+                             converted = eq_cross%time_slice(1)%boundary%closest_wall_point%r), &
+                verdict_real(oracle = eq_control%time_slice(1)%boundary%closest_wall_point%z, &
+                             converted = eq_cross%time_slice(1)%boundary%closest_wall_point%z)))
   call checker%check('move-dr-dz-zero-point', &
        combine_pair('move-dr-dz-zero-point', &
-                verdict_real(eq_cross%time_slice(1)%boundary%dr_dz_zero_point%r, &
-                              eq_control%time_slice(1)%boundary%dr_dz_zero_point%r), &
-                verdict_real(eq_cross%time_slice(1)%boundary%dr_dz_zero_point%z, &
-                              eq_control%time_slice(1)%boundary%dr_dz_zero_point%z)))
+                verdict_real(oracle = eq_control%time_slice(1)%boundary%dr_dz_zero_point%r, &
+                             converted = eq_cross%time_slice(1)%boundary%dr_dz_zero_point%r), &
+                verdict_real(oracle = eq_control%time_slice(1)%boundary%dr_dz_zero_point%z, &
+                             converted = eq_cross%time_slice(1)%boundary%dr_dz_zero_point%z)))
   call checker%check('move-gap', &
        combine_pair('move-gap', &
-                verdict_real(eq_cross%time_slice(1)%boundary%gap(1)%r, &
-                              eq_control%time_slice(1)%boundary%gap(1)%r), &
-                verdict_real(eq_cross%time_slice(1)%boundary%gap(1)%z, &
-                              eq_control%time_slice(1)%boundary%gap(1)%z)))
+                verdict_real(oracle = eq_control%time_slice(1)%boundary%gap(1)%r, &
+                             converted = eq_cross%time_slice(1)%boundary%gap(1)%r), &
+                verdict_real(oracle = eq_control%time_slice(1)%boundary%gap(1)%z, &
+                             converted = eq_cross%time_slice(1)%boundary%gap(1)%z)))
 
   ! -- merged folds --
-  call checker%check('fold-p2d-br', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_r, &
-                                             eq_control%time_slice(1)%profiles_2d(1)%b_field_r))
-  call checker%check('fold-p2d-bz', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_z, &
-                                             eq_control%time_slice(1)%profiles_2d(1)%b_field_z))
-  call checker%check('fold-p2d-bphi', verdict_real_matrix_as_read(eq_cross%time_slice(1)%profiles_2d(1)%b_field_phi, &
-                                               eq_control%time_slice(1)%profiles_2d(1)%b_field_phi))
+  call checker%check('fold-p2d-br', &
+       verdict_real_matrix_as_read(oracle = eq_control%time_slice(1)%profiles_2d(1)%b_field_r, &
+                                   converted = eq_cross%time_slice(1)%profiles_2d(1)%b_field_r))
+  call checker%check('fold-p2d-bz', &
+       verdict_real_matrix_as_read(oracle = eq_control%time_slice(1)%profiles_2d(1)%b_field_z, &
+                                   converted = eq_cross%time_slice(1)%profiles_2d(1)%b_field_z))
+  call checker%check('fold-p2d-bphi', &
+       verdict_real_matrix_as_read(oracle = eq_control%time_slice(1)%profiles_2d(1)%b_field_phi, &
+                                   converted = eq_cross%time_slice(1)%profiles_2d(1)%b_field_phi))
   call checker%check('fold-axis-bphi', &
-       verdict_real(eq_cross%time_slice(1)%global_quantities%magnetic_axis%b_field_phi, &
-                    eq_control%time_slice(1)%global_quantities%magnetic_axis%b_field_phi))
+       verdict_real(oracle = eq_control%time_slice(1)%global_quantities%magnetic_axis%b_field_phi, &
+                    converted = eq_cross%time_slice(1)%global_quantities%magnetic_axis%b_field_phi))
   call checker%check('fold-p1d-baverage', &
-       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_average, &
-                                   eq_control%time_slice(1)%profiles_1d%b_field_average))
+       verdict_real_vector_as_read(oracle = eq_control%time_slice(1)%profiles_1d%b_field_average, &
+                                   converted = eq_cross%time_slice(1)%profiles_1d%b_field_average))
   call checker%check('fold-p1d-bmax', &
-       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_max, &
-                                   eq_control%time_slice(1)%profiles_1d%b_field_max))
+       verdict_real_vector_as_read(oracle = eq_control%time_slice(1)%profiles_1d%b_field_max, &
+                                   converted = eq_cross%time_slice(1)%profiles_1d%b_field_max))
   call checker%check('fold-p1d-bmin', &
-       verdict_real_vector_as_read(eq_cross%time_slice(1)%profiles_1d%b_field_min, &
-                                   eq_control%time_slice(1)%profiles_1d%b_field_min))
+       verdict_real_vector_as_read(oracle = eq_control%time_slice(1)%profiles_1d%b_field_min, &
+                                   converted = eq_cross%time_slice(1)%profiles_1d%b_field_min))
   call checker%check('fold-energy-mhd', &
-       verdict_real(eq_cross%time_slice(1)%global_quantities%energy_mhd, &
-                    eq_control%time_slice(1)%global_quantities%energy_mhd))
+       verdict_real(oracle = eq_control%time_slice(1)%global_quantities%energy_mhd, &
+                    converted = eq_cross%time_slice(1)%global_quantities%energy_mhd))
   call checker%check('fold-constraints-j', &
-       position_measured_verdict(eq_cross%time_slice(1)%constraints%j_phi, &
-                                 eq_control%time_slice(1)%constraints%j_phi))
+       position_measured_verdict(oracle = eq_control%time_slice(1)%constraints%j_phi, &
+                                 converted = eq_cross%time_slice(1)%constraints%j_phi))
   call checker%check('fold-ggd-j', &
-       ggd_values_verdict(eq_cross%time_slice(1)%ggd(1)%j_phi, &
-                          eq_control%time_slice(1)%ggd(1)%j_phi))
+       ggd_values_verdict(oracle = eq_control%time_slice(1)%ggd(1)%j_phi, &
+                          converted = eq_cross%time_slice(1)%ggd(1)%j_phi))
   call checker%check('fold-ggd-bfield', &
-       ggd_values_verdict(eq_cross%time_slice(1)%ggd(1)%b_field_phi, &
-                          eq_control%time_slice(1)%ggd(1)%b_field_phi))
+       ggd_values_verdict(oracle = eq_control%time_slice(1)%ggd(1)%b_field_phi, &
+                          converted = eq_cross%time_slice(1)%ggd(1)%b_field_phi))
 
   ! -- split: one DD3 source feeds two DD4 targets; both must agree --
   call checker%check('split-psi-axis', &
        combine_pair('split-psi-axis', &
-                verdict_real(eq_cross%time_slice(1)%global_quantities%psi_axis, &
-                              eq_control%time_slice(1)%global_quantities%psi_axis), &
-                verdict_real(eq_cross%time_slice(1)%global_quantities%psi_magnetic_axis, &
-                              eq_control%time_slice(1)%global_quantities%psi_magnetic_axis)))
+                verdict_real(oracle = eq_control%time_slice(1)%global_quantities%psi_axis, &
+                             converted = eq_cross%time_slice(1)%global_quantities%psi_axis), &
+                verdict_real(oracle = eq_control%time_slice(1)%global_quantities%psi_magnetic_axis, &
+                             converted = eq_cross%time_slice(1)%global_quantities%psi_magnetic_axis)))
 
   call checker%assert_every_rule_checked(checker%expectations)
 
@@ -133,36 +148,36 @@ contains
 
   ! A refused merged AOS is left unassociated by the generated reader. Judge
   ! its presence before sampling a child so the checker can name the rule.
-  function position_measured_verdict(cross, control) result(verdict)
-    type(ids_equilibrium_constraints_0D_position), pointer, intent(in) :: cross(:), control(:)
+  function position_measured_verdict(oracle, converted) result(verdict)
+    type(ids_equilibrium_constraints_0D_position), pointer, intent(in) :: oracle(:), converted(:)
     character(len=verdict_len) :: verdict
-    logical :: has_cross, has_control
+    logical :: has_oracle, has_converted
 
-    has_cross = associated(cross)
-    if (has_cross) has_cross = size(cross) >= 1
-    has_control = associated(control)
-    if (has_control) has_control = size(control) >= 1
+    has_oracle = associated(oracle)
+    if (has_oracle) has_oracle = size(oracle) >= 1
+    has_converted = associated(converted)
+    if (has_converted) has_converted = size(converted) >= 1
 
-    verdict = presence_verdict(has_cross, has_control)
+    verdict = presence_verdict(has_oracle = has_oracle, has_converted = has_converted)
     if (verdict /= '') return
-    verdict = verdict_real(cross(1)%measured, control(1)%measured)
+    verdict = verdict_real(oracle = oracle(1)%measured, converted = converted(1)%measured)
   end function position_measured_verdict
 
   ! These folds map an AOS of generic-grid scalars. One populated values
   ! vector proves that the rule translated and served its target.
-  function ggd_values_verdict(cross, control) result(verdict)
-    type(ids_generic_grid_scalar), pointer, intent(in) :: cross(:), control(:)
+  function ggd_values_verdict(oracle, converted) result(verdict)
+    type(ids_generic_grid_scalar), pointer, intent(in) :: oracle(:), converted(:)
     character(len=verdict_len) :: verdict
-    logical :: has_cross, has_control
+    logical :: has_oracle, has_converted
 
-    has_cross = associated(cross)
-    if (has_cross) has_cross = size(cross) >= 1
-    has_control = associated(control)
-    if (has_control) has_control = size(control) >= 1
+    has_oracle = associated(oracle)
+    if (has_oracle) has_oracle = size(oracle) >= 1
+    has_converted = associated(converted)
+    if (has_converted) has_converted = size(converted) >= 1
 
-    verdict = presence_verdict(has_cross, has_control)
+    verdict = presence_verdict(has_oracle = has_oracle, has_converted = has_converted)
     if (verdict /= '') return
-    verdict = verdict_real_vector_as_read(cross(1)%values, control(1)%values)
+    verdict = verdict_real_vector_as_read(oracle = oracle(1)%values, converted = converted(1)%values)
   end function ggd_values_verdict
 
   ! One rule can combine several leaf verdicts (e.g. an r/z pair); the rule
@@ -186,8 +201,5 @@ contains
       combined = second
     end if
   end function combine_pair
-
-
-
 
 end program test_shim_structural_rules

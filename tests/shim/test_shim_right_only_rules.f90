@@ -9,25 +9,29 @@
 ! program asserts it rather than treating it as a defect.
 !
 ! ---------------------------------------------------------------------------
-! Argument order matters here, and only here.
+! Which side is which decides every verdict here, so every side is named.
 !
-! The comparison primitives take the DD 4 side first and the shim-served side
-! second. With that order a served-nothing reading comes back `only4` — "the
-! DD 4 oracle has a value, the shim served nothing" — which is the verdict
-! `expected_verdict_for_kind(rule_kind_right_only)` requires. Passing the two
-! reads the other way round reports `only3` for the same reading and every
-! assertion below would fail for a reason that has nothing to do with the
-! shim. test_shim_structural_rules passes them in the opposite order, which
-! does not change whether it passes — every verdict it expects is `same`, and
-! the primitives reach `same` symmetrically — but it does change how it reads
-! when it fails: a structural rule the shim served nothing for prints `only3`,
-! "a value on the DD 3 side only", for a reading where the value is in fact on
-! the DD 4 side. That is a legibility defect in a failure message rather than
-! a wrong verdict, and it belongs to that test rather than this one.
+! A served-nothing reading is `only4` — "the DD 4 oracle has a value, the shim
+! served nothing" — which is the verdict
+! `expected_verdict_for_kind(rule_kind_right_only)` requires. Name the two
+! readings the other way round and the same reading is `only3`, and every
+! assertion below fails for a reason that has nothing to do with the shim.
+!
+! This program has always got that right, and used to be the only one that
+! did: the comparison primitives took the sides positionally, and
+! test_shim_structural_rules and test_shim_cocos_rules passed the shim-served
+! reading first for every rule. Their expectations are all `same`, which the
+! primitives reach symmetrically, so their pass/fail was unaffected and no
+! assertion in the suite could notice — but each of their served-nothing
+! readings reported `only3`, "a value on the DD 3 side only", for a reading
+! whose value is on the DD 4 side, and that label went into
+! tests/shim/README.md as the account of what the shim did. The primitives now
+! reject a positional call, so `oracle=` and `converted=` are spelled at every
+! call site in the suite and the compiler keeps the three programs consistent.
 !
 ! This is also why the loss log file is a second channel rather than the only
 ! one: a value comparison on its own distinguishes a served field from a
-! refused one, provided the shim-read column is the second argument.
+! refused one, provided each side is named for what it is.
 ! ---------------------------------------------------------------------------
 !
 ! A failing check names the rule that broke (id, kind and cited source), not
@@ -77,59 +81,65 @@ program test_shim_right_only_rules
   call gather_contour_nodes(eq_control, control_values, has_control)
   call gather_contour_nodes(eq_cross, cross_values, has_cross)
   call checker%check('new-contour-tree', combine([ &
-       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values), &
-       contour_edges_verdict(eq_control, eq_cross)]))
+       verdict_real_vector_with_stated_presence( &
+            has_oracle = has_control, oracle = control_values, &
+            has_converted = has_cross, converted = cross_values), &
+       contour_edges_verdict(oracle = eq_control, converted = eq_cross)]))
 
   call gather_j_parallel(eq_control, control_values, has_control)
   call gather_j_parallel(eq_cross, cross_values, has_cross)
   call checker%check('new-constraints-j-parallel', &
-       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values))
+       verdict_real_vector_with_stated_presence( &
+            has_oracle = has_control, oracle = control_values, &
+            has_converted = has_cross, converted = cross_values))
 
   ! `convergence/result` is an identifier structure whose only leaf in the
   ! map's two-path note is `index`; the shim serving nothing leaves it at the
   ! integer sentinel.
   call checker%check('new-convergence-result', &
-       verdict_integer(eq_control%time_slice(1)%convergence%result%index, &
-                       eq_cross%time_slice(1)%convergence%result%index))
+       verdict_integer(oracle = eq_control%time_slice(1)%convergence%result%index, &
+                       converted = eq_cross%time_slice(1)%convergence%result%index))
 
   ! -- boundary --
   call checker%check('new-boundary-rho-tor', &
-       verdict_real(eq_control%time_slice(1)%boundary%rho_tor, &
-                    eq_cross%time_slice(1)%boundary%rho_tor))
+       verdict_real(oracle = eq_control%time_slice(1)%boundary%rho_tor, &
+                    converted = eq_cross%time_slice(1)%boundary%rho_tor))
   call checker%check('new-boundary-phi', &
-       verdict_real(eq_control%time_slice(1)%boundary%phi, &
-                    eq_cross%time_slice(1)%boundary%phi))
+       verdict_real(oracle = eq_control%time_slice(1)%boundary%phi, &
+                    converted = eq_cross%time_slice(1)%boundary%phi))
   call checker%check('new-boundary-phi-poloidal-current', &
-       verdict_real(eq_control%time_slice(1)%boundary%phi_poloidal_current, &
-                    eq_cross%time_slice(1)%boundary%phi_poloidal_current))
+       verdict_real(oracle = eq_control%time_slice(1)%boundary%phi_poloidal_current, &
+                    converted = eq_cross%time_slice(1)%boundary%phi_poloidal_current))
 
   ! -- global_quantities --
   call checker%check('new-q-min-psi', &
-       verdict_real(eq_control%time_slice(1)%global_quantities%q_min%psi, &
-                    eq_cross%time_slice(1)%global_quantities%q_min%psi))
+       verdict_real(oracle = eq_control%time_slice(1)%global_quantities%q_min%psi, &
+                    converted = eq_cross%time_slice(1)%global_quantities%q_min%psi))
   call checker%check('new-q-min-psi-norm', &
-       verdict_real(eq_control%time_slice(1)%global_quantities%q_min%psi_norm, &
-                    eq_cross%time_slice(1)%global_quantities%q_min%psi_norm))
+       verdict_real(oracle = eq_control%time_slice(1)%global_quantities%q_min%psi_norm, &
+                    converted = eq_cross%time_slice(1)%global_quantities%q_min%psi_norm))
   call checker%check('new-global-quantities-rho-tor-boundary', &
-       verdict_real(eq_control%time_slice(1)%global_quantities%rho_tor_boundary, &
-                    eq_cross%time_slice(1)%global_quantities%rho_tor_boundary))
+       verdict_real(oracle = eq_control%time_slice(1)%global_quantities%rho_tor_boundary, &
+                    converted = eq_cross%time_slice(1)%global_quantities%rho_tor_boundary))
 
   ! -- constraints --
   call checker%check('new-constraints-chi-squared-reduced', &
-       verdict_real(eq_control%time_slice(1)%constraints%chi_squared_reduced, &
-                    eq_cross%time_slice(1)%constraints%chi_squared_reduced))
+       verdict_real(oracle = eq_control%time_slice(1)%constraints%chi_squared_reduced, &
+                    converted = eq_cross%time_slice(1)%constraints%chi_squared_reduced))
   call checker%check('new-constraints-freedom-degrees-n', &
-       verdict_integer(eq_control%time_slice(1)%constraints%freedom_degrees_n, &
-                       eq_cross%time_slice(1)%constraints%freedom_degrees_n))
+       verdict_integer(oracle = eq_control%time_slice(1)%constraints%freedom_degrees_n, &
+                       converted = eq_cross%time_slice(1)%constraints%freedom_degrees_n))
   call checker%check('new-constraints-constraints-n', &
-       verdict_integer(eq_control%time_slice(1)%constraints%constraints_n, &
-                       eq_cross%time_slice(1)%constraints%constraints_n))
+       verdict_integer(oracle = eq_control%time_slice(1)%constraints%constraints_n, &
+                       converted = eq_cross%time_slice(1)%constraints%constraints_n))
 
   ! -- profiles_1d --
   call gather_p1d_psi_norm(eq_control, control_values, has_control)
   call gather_p1d_psi_norm(eq_cross, cross_values, has_cross)
   call checker%check('new-profiles-1d-psi-norm', &
-       verdict_real_vector_with_stated_presence(has_control, control_values, has_cross, cross_values))
+       verdict_real_vector_with_stated_presence( &
+            has_oracle = has_control, oracle = control_values, &
+            has_converted = has_cross, converted = cross_values))
 
   ! -------------------------------------------------------------------------
   ! The hole this closes, demonstrated rather than asserted in prose.
@@ -151,14 +161,26 @@ program test_shim_right_only_rules
   ! reading is not in fact a served-nothing one, so this cannot pass
   ! vacuously. The second is the property itself.
   !
-  ! The anchor is deliberately `global_quantities/rho_tor_boundary`, one of
-  ! the eight rules that hold today, and it must stay one of those: anchoring
-  ! it on one of the five documented reds would fail the first expectation and
-  ! turn a real finding into a confusing demonstration failure. Note it is not
-  ! `boundary/rho_tor`, which is a different path and one of the five.
+  ! The anchor must be a rule that holds today, or the first expectation fails
+  ! and a real finding turns into a confusing demonstration failure on top of
+  ! it. It was `global_quantities/rho_tor_boundary`, chosen when eight of the
+  ! thirteen rules held; ten of them are red now, that path among them, and the
+  ! demonstration was duly failing for the same single cause as the ten rather
+  ! than demonstrating anything. It is now `profiles_1d/psi_norm`, one of the
+  ! three that hold.
+  !
+  ! Those three are all array-valued, which is why the anchor is now judged
+  ! with the vector primitive: no scalar `right_only` rule is served-nothing
+  ! any more, so no scalar reading can carry this demonstration while the shim
+  ! behaves as it does. If the remaining three ever go red as well, this
+  ! demonstration has no anchor left and the first expectation says so rather
+  ! than the property quietly ceasing to be checked.
   ! -------------------------------------------------------------------------
-  served_nothing = verdict_real(eq_control%time_slice(1)%global_quantities%rho_tor_boundary, &
-                                eq_cross%time_slice(1)%global_quantities%rho_tor_boundary)
+  call gather_p1d_psi_norm(eq_control, control_values, has_control)
+  call gather_p1d_psi_norm(eq_cross, cross_values, has_cross)
+  served_nothing = verdict_real_vector_with_stated_presence( &
+       has_oracle = has_control, oracle = control_values, &
+       has_converted = has_cross, converted = cross_values)
   agreement_expected = expected_verdict_for_kind(structural_rules(1)%kind)
 
   call demonstrate(verdicts_agree(served_nothing, expected_verdict_for_kind(rule_kind_right_only)), &
@@ -210,15 +232,17 @@ contains
   ! asserting per rule rather than per leaf — a right_only rule is served or
   ! it is not, and the sampled leaves are enough to say which — but it is a
   ! sample, and a shim serving part of a subtree would not be caught here.
-  function contour_edges_verdict(control, cross) result(verdict)
-    type(ids_equilibrium), intent(in) :: control, cross
+  function contour_edges_verdict(oracle, converted) result(verdict)
+    type(ids_equilibrium), intent(in) :: oracle, converted
     character(len=verdict_len) :: verdict
-    real(ids_real), allocatable :: control_edges(:), cross_edges(:)
-    logical :: control_has, cross_has
+    real(ids_real), allocatable :: oracle_edges(:), converted_edges(:)
+    logical :: oracle_has, converted_has
 
-    call gather_contour_edges(control, control_edges, control_has)
-    call gather_contour_edges(cross, cross_edges, cross_has)
-    verdict = verdict_real_vector_with_stated_presence(control_has, control_edges, cross_has, cross_edges)
+    call gather_contour_edges(oracle, oracle_edges, oracle_has)
+    call gather_contour_edges(converted, converted_edges, converted_has)
+    verdict = verdict_real_vector_with_stated_presence( &
+                   has_oracle = oracle_has, oracle = oracle_edges, &
+                   has_converted = converted_has, converted = converted_edges)
   end function contour_edges_verdict
 
   logical function has_time_slice(equilibrium)

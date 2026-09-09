@@ -110,6 +110,22 @@ set_tests_properties( al-fortran-test-shim-comparison PROPERTIES
   LABELS "shim;contract-assertion"
 )
 
+# The half of the oracle's contract that no Fortran assertion can carry: which
+# of a comparison's two readings is the oracle and which is the shim-served
+# one.  Both `only3` and `only4` differ from `same`, so naming them the wrong
+# way round leaves every pass and fail in the suite unchanged and only corrupts
+# the diagnosis -- which is how the structural and COCOS programs came to
+# report `only3` for readings whose value is on the DD 4 side.  The script says
+# why it is a source check rather than a program.
+add_test( NAME al-fortran-test-shim-verdict-orientation
+  COMMAND ${CMAKE_COMMAND}
+    -D "SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/check_verdict_orientation.cmake"
+)
+set_tests_properties( al-fortran-test-shim-verdict-orientation PROPERTIES
+  LABELS "shim;contract-assertion"
+)
+
 # Fixture provenance (issue #64): the checked-in pulses must be what their
 # generator produces, or every assertion in this suite is against numbers
 # nobody can re-derive.  verify_fixtures.sh regenerates them outside the

@@ -27,10 +27,13 @@
 ! the two is the absence of the value plus a named entry in the skip log,
 ! which is why every rule below is asserted on both.
 !
-! Argument order is load-bearing. The comparison primitives name their absent
-! side `only3` / `only4`, so the DD 4.1.1 control read is passed FIRST and the
-! shim's cross-version read SECOND; a served-nothing then reads as `only4`,
-! which is the verdict shim_rule_table expects for both refusal kinds.
+! Which side is which is load-bearing. The comparison primitives name their
+! absent side `only3` / `only4`, so every call below names the DD 4.1.1 control
+! read `oracle=` and the shim's cross-version read `converted=`; a
+! served-nothing then reads as `only4`, which is the verdict shim_rule_table
+! expects for both refusal kinds. The primitives reject a positional call, so
+! this cannot be got wrong silently the way it was in the structural and COCOS
+! programs.
 !
 ! A failing check names the rule that broke -- id, kind and cited source --
 ! not only the field.
@@ -162,30 +165,30 @@ program test_shim_refusal_rules
   call check_refused_in_skip_log('retype-coordinates-type', retyped_refusal_reason)
 
   call check_rule('retype-coordinates-type', &
-                  verdict_integer(first_coordinates_index(eq_control), &
-                                  first_coordinates_index(eq_cross)))
+                  verdict_integer(oracle = first_coordinates_index(eq_control), &
+                                  converted = first_coordinates_index(eq_cross)))
 
   ! A served field from after the refusal, to show the read carried on
   ! serving data and not merely carried on. beta_pol is the structural
   ! table's `identical-beta-pol`.
-  call expect(verdict_real(eq_control%time_slice(1)%global_quantities%beta_pol, &
-                           eq_cross%time_slice(1)%global_quantities%beta_pol) == 'same', &
+  call expect(verdict_real(oracle = eq_control%time_slice(1)%global_quantities%beta_pol, &
+                           converted = eq_cross%time_slice(1)%global_quantities%beta_pol) == 'same', &
               'a field after the refusal is still served')
 
   ! -- The four unit-redefinition rules: asserted served, red until the
   !    shim stops refusing them.  See the header. -------------------------
   call check_served('redefine-x-point-chi-sq-r', &
-                       chi_squared_r_of(eq_control%time_slice(1)%constraints%x_point), &
-                       chi_squared_r_of(eq_cross%time_slice(1)%constraints%x_point))
+       oracle_value = chi_squared_r_of(eq_control%time_slice(1)%constraints%x_point), &
+       converted_value = chi_squared_r_of(eq_cross%time_slice(1)%constraints%x_point))
   call check_served('redefine-x-point-chi-sq-z', &
-                       chi_squared_z_of(eq_control%time_slice(1)%constraints%x_point), &
-                       chi_squared_z_of(eq_cross%time_slice(1)%constraints%x_point))
+       oracle_value = chi_squared_z_of(eq_control%time_slice(1)%constraints%x_point), &
+       converted_value = chi_squared_z_of(eq_cross%time_slice(1)%constraints%x_point))
   call check_served('redefine-strike-pt-chi-sq-r', &
-                       chi_squared_r_of(eq_control%time_slice(1)%constraints%strike_point), &
-                       chi_squared_r_of(eq_cross%time_slice(1)%constraints%strike_point))
+       oracle_value = chi_squared_r_of(eq_control%time_slice(1)%constraints%strike_point), &
+       converted_value = chi_squared_r_of(eq_cross%time_slice(1)%constraints%strike_point))
   call check_served('redefine-strike-pt-chi-sq-z', &
-                       chi_squared_z_of(eq_control%time_slice(1)%constraints%strike_point), &
-                       chi_squared_z_of(eq_cross%time_slice(1)%constraints%strike_point))
+       oracle_value = chi_squared_z_of(eq_control%time_slice(1)%constraints%strike_point), &
+       converted_value = chi_squared_z_of(eq_cross%time_slice(1)%constraints%strike_point))
 
   ! -- Nothing here may pass by doing nothing. ---------------------------
   call assert_ran_count(checker%marker, 'expectations in this program ran', &
@@ -339,16 +342,16 @@ contains
   ! value must arrive, and no refusal for it may appear in the skip log.
   ! Both halves are red while the shim refuses the path -- the second one is
   ! what names the refusal that should not have happened.
-  subroutine check_served(id, control_value, cross_value)
+  subroutine check_served(id, oracle_value, converted_value)
     character(len=*), intent(in) :: id
-    real(ids_real), intent(in) :: control_value, cross_value
+    real(ids_real), intent(in) :: oracle_value, converted_value
     character(len=96) :: dd_path
 
     dd_path = checker%rules(checker%find(id))%hli_path
     call expect(.not. skip_log_names(last_segment(trim(dd_path)), &
                                      redefined_refusal_reason, trim(dd_path)), &
                 'no unit-redefinition refusal is recorded for '//trim(dd_path))
-    call check_rule(id, verdict_real(control_value, cross_value))
+    call check_rule(id, verdict_real(oracle = oracle_value, converted = converted_value))
   end subroutine check_served
 
   ! Channel 2 for one rule, with the path taken from the rule table rather
