@@ -72,11 +72,21 @@ module al_defs
   ! See al_get_policy for the skip log that says which paths.
   integer, parameter :: PARTIAL_READ        = 1
 
-  ! The write counterpart: the put completed, but at least one path was refused
-  ! and the caller's value for it was not stored. Positive for the same reason,
-  ! and distinct from PARTIAL_READ so that a caller doing both can tell which
-  ! half was incomplete. See al_put_policy for why a refused write is tolerated
-  ! at all, and for what it does and does not record about the dropped paths.
+  ! The write counterpart: the operation completed, but at least one path was
+  ! refused. Positive for the same reason, and distinct from PARTIAL_READ so
+  ! that a caller doing both can tell which half was incomplete. See
+  ! al_put_policy for why a refused write is tolerated at all, and for what it
+  ! does and does not record about the affected paths.
+  !
+  ! Two refusals reach a caller through this one code, and they are not the
+  ! same thing. From ids_put or ids_put_slice, a refused *write*: a value the
+  ! caller supplied was not stored. From ids_delete, or from the delete ids_put
+  ! performs first, a refused *delete*: a value the caller did not supply was
+  ! not removed, so the occurrence still holds data the operation meant to
+  ! replace. The printed record distinguishes them by wording; the status
+  ! deliberately does not, because the caller's question at this level is the
+  ! same either way -- the occurrence is not what I asked for, go and read what
+  ! was refused.
   integer, parameter :: PARTIAL_PUT         = 2
 
   integer, parameter :: IDS_TIME_MODE_UNKNOWN = -999999999
