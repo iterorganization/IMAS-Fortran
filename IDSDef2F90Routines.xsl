@@ -535,24 +535,91 @@ end interface
 contains
 
 !!!!!! Routine to DELETE the IDS
-subroutine ids_delete_<xsl:value-of select="local:unique_name(@name)"/>(pulsectx, IDSpath, IDS)  <!-- systematic calls to the low level delete_data routine. The IDS input argument is added just for the interface to identify the relevant IDS type -->
+subroutine ids_delete_<xsl:value-of select="local:unique_name(@name)"/>(pulsectx, IDSpath, IDS, retstatus)  <!-- systematic calls to the low level delete_data routine. The IDS input argument is added just for the interface to identify the relevant IDS type -->
   use ids_schemas_<xsl:value-of select="@name"/>
   use al_low_level_wrap
+  use al_put_policy
   implicit none
   character*(*) :: IDSpath
+  <!-- Optional, so every existing caller of the generic ids_delete keeps
+       compiling unchanged across all 82 IDSs, and so this routine can keep the
+       STOP it had for a caller that asked for no status. Same shape as
+       ids_put's and ids_get's retstatus for the same reason. -->
+  integer(ids_int), intent(out), optional :: retstatus
   integer(ids_int) :: pulsectx, opctx, status
   type(ids_<xsl:value-of select="@name"/>) :: IDS
 
+  <!-- Before the traversal, so the count describes this delete. ids_put calls
+       this routine and reads the count afterwards; see al_put_policy for why
+       the delete phase resets its own counter rather than sharing ids_put's
+       reset, which happens after the delete. -->
+  call al_reset_refused_deletes()
+
   call al_begin_global_action(pulsectx, IDSpath, WRITE_OP, opctx, status)
   if (status.ne.0) then
-     STOP 'Error in al_begin_global_action (from ids_delete for IDS <xsl:value-of select="@name"/>)'
+     write(*,*) 'Error in al_begin_global_action (from ids_delete for IDS <xsl:value-of select="@name"/>)'
+     <!-- Not a tolerable refusal even when it is one. An interposing layer
+          returns the refusal code here for a malformed version stamp or a
+          version-latch conflict, and tolerating it would run the traversal
+          against an occurrence that was never opened, which is the site both
+          policy modules name as barred. So the status is reported, not absorbed. It
+          is reported rather than fatal only where the caller asked for it:
+          this routine used to STOP unconditionally, which took the calling
+          program down for a refusal ids_put could have returned. -->
+     if (present(retstatus)) then
+        retstatus = status
+     else
+        STOP 'Error in al_begin_global_action (from ids_delete for IDS <xsl:value-of select="@name"/>)'
+     end if
+     return
   end if
 
   <xsl:apply-templates select="field" mode="DELETE"/>
 
   call al_end_action(opctx,status)
 
+  <!-- A refused delete leaves stored data the traversal asked to remove, so
+       the occurrence is not what the caller asked for even though every call
+       the layer accepted succeeded. PARTIAL_PUT says so: positive, so it can
+       never be confused with a C-ABI status, and it still trips the
+       `status.ne.0` test callers already write. Without this the refusal is
+       recorded on stdout by al_note_refused_delete and nowhere a program can
+       reach. -->
+  if (present(retstatus)) then
+     if (status == 0 .and. al_get_refused_delete_count() > 0) then
+        retstatus = PARTIAL_PUT
+     else
+        retstatus = status
+     end if
+  end if
+
 end subroutine ids_delete_<xsl:value-of select="local:unique_name(@name)"/>
+
+<!-- One delete site, with the layer's refusal recorded instead of discarded.
+     A subroutine rather than two statements per site because there are 7757 of
+     them in the generated tree and the path literal would otherwise be emitted
+     twice at each one. Named per IDS like the routine above, because
+     ids_routines uses all 82 of these modules in one scope. -->
+!!!!!! One field's delete, recording a refusal the layer declared
+subroutine delete_field_<xsl:value-of select="local:unique_name(@name)"/>(opctx, path, status)
+  use al_low_level_wrap
+  use al_put_policy
+  implicit none
+  integer, intent(in) :: opctx
+  character*(*), intent(in) :: path
+  integer, intent(out) :: status
+
+  call al_delete_data(opctx, path, status)
+  <!-- Only a refusal is recorded. Every other non-zero status is discarded
+       exactly as before: this traversal deletes all 7757 paths of the IDS
+       whether or not the occurrence holds them, so an ordinary not-found is
+       the normal case here and has always been ignored. Changing that is a
+       separate question from making a refusal visible. -->
+  if (is_external_refusal(status)) then
+     call al_note_refused_delete(path, status)
+  end if
+
+end subroutine delete_field_<xsl:value-of select="local:unique_name(@name)"/>
 
 end module <xsl:value-of select="@name"/>_delete
   </xsl:result-document>
@@ -1035,6 +1102,7 @@ subroutine put_struct_ids_<xsl:value-of select="local:unique_name(@name)"/>(puls
   character(len=300) :: timepath
   character(*), parameter :: path = ''
   integer(ids_int) :: validation_status
+  integer(ids_int) :: deletestatus
   character(:), allocatable :: err_msg
   character(len=1) :: buffer
 
@@ -1060,11 +1128,33 @@ subroutine put_struct_ids_<xsl:value-of select="local:unique_name(@name)"/>(puls
   end if 
 
   ! Systematic delete of the previous IDS, in case it existed
-  call ids_delete(pulsectx, name, IDS)
+  <!-- Asked for a status, which this call could not report before. Two
+       outcomes are now distinguishable: a refused delete, which leaves stored
+       data behind and makes this put partial (folded into the derivation at
+       the end of the routine, where the write refusals are), and a failure to
+       open the occurrence at all, which is fatal to the operation. -->
+  call ids_delete(pulsectx, name, IDS, deletestatus)
+  if (deletestatus.lt.0) then
+     <!-- The occurrence was never opened for the delete, so the previous
+          contents are entirely intact and the traversal below would write
+          into an occurrence still holding them. Return the real status rather
+          than proceeding; before this call reported anything, ids_delete took
+          the whole program down here instead. -->
+     write(*,*) 'Error deleting the previous IDS <xsl:value-of select="@name"/> before put'
+     if (present(retstatus)) then
+        retstatus = deletestatus
+     else
+        STOP
+     end if
+     return
+  end if
 
   if (IDS%ids_properties%homogeneous_time.EQ.IDS_TIME_MODE_UNKNOWN) then
      write(*,*) "Warning : <xsl:value-of select="@name"/> is found to be EMPTY (homogeneous_time undefined). PUT returns with no action."
-     if (present(retstatus)) retstatus = 0
+     <!-- "No action" is not quite true once the delete above has run: an
+          empty IDS is still put by clearing the occurrence, and a refused
+          delete means it was not cleared. Report that rather than 0. -->
+     if (present(retstatus)) retstatus = deletestatus
      return
   endif
 
@@ -1136,8 +1226,16 @@ subroutine put_struct_ids_<xsl:value-of select="local:unique_name(@name)"/>(puls
        and it still trips the `status.ne.0` test callers already write. Without
        this the tolerance of a refused write would be silent, which is the one
        outcome al_put_policy exists to prevent. -->
+  <!-- Both phases of the operation count. A refused write dropped a value the
+       caller supplied; a refused delete left one they did not. Either makes
+       the occurrence something other than what they asked for, and CONTEXT.md
+       derives a partial outcome from refusals during the operation the caller
+       asked for, which is this whole routine, delete included. The delete
+       count is still the one ids_delete recorded a few lines up: nothing
+       between resets it, and al_reset_refused_writes above touches only the
+       write counter. -->
   if (present(retstatus)) then
-     if (status == 0 .and. al_get_refused_write_count() > 0) then
+     if (status == 0 .and. (al_get_refused_write_count() > 0 .or. al_get_refused_delete_count() > 0)) then
         retstatus = PARTIAL_PUT
      else
         retstatus = status
@@ -4229,7 +4327,10 @@ end module
         <xsl:with-param name ="field_path" select="$updated_field_path"/>
       </xsl:apply-templates>
     </xsl:when>
-    <xsl:otherwise>call al_delete_data(opctx, <xsl:value-of select="$updated_field_path"/>, status)
+    <!-- Through the per-IDS wrapper rather than straight to al_delete_data, so
+         a refusal the interposing layer declares here is recorded rather than
+         dropped on the floor with the status. -->
+    <xsl:otherwise>call delete_field_<xsl:value-of select="local:unique_name(ancestor::IDS/@name)"/>(opctx, <xsl:value-of select="$updated_field_path"/>, status)
     </xsl:otherwise>
   </xsl:choose>
 </xsl:template>

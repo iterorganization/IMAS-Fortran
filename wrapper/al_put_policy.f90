@@ -108,8 +108,40 @@
 ! same code for a malformed version stamp or a version-latch conflict.
 !
 !
-! The counter is process-global and not thread-safe. That matches the rest of
-! the generated code, which is already non-reentrant in the same way (the
+! The refused delete, and why it is counted separately
+!
+! `ids_put` opens by deleting the previous occurrence, and an interposing layer
+! can refuse a delete as well as a write -- the DD-version stamp is the case
+! that exists today: removing it while stored data remains would leave a pulse
+! holding data no reader can date, so the layer refuses it (see
+! docs/SHIM_INTEGRATION_CONTRACT.md section 6).
+!
+! That refusal was invisible. The generated delete traversal called
+! `al_delete_data` and discarded its status at all 7757 sites, `ids_delete` had
+! no `retstatus` to report through, and the write counter was reset *after* the
+! delete anyway -- so a put whose stale data was never removed returned 0, and
+! a caller had no way to learn otherwise. Tolerating without recording is the
+! one outcome this module exists to prevent, and it was happening on a whole
+! phase of the operation.
+!
+! It is a second counter rather than more entries in the first, for two
+! reasons. The consequence differs in kind: a refused write drops a value the
+! caller supplied, while a refused delete leaves behind a value they did not,
+! so an occurrence can end up complete, correct in everything the caller sent,
+! and still not be what they asked for. And `ids_delete` is a public entry
+! point in its own right -- one counter would make a standalone delete's report
+! depend on whatever put ran before it. Each phase resets and reports its own
+! count; `ids_put` derives its partial outcome from both, which is what
+! CONTEXT.md's "partial outcome" requires of the operation the caller asked
+! for.
+!
+! `ids_put_slice` deliberately does not consult the delete counter. It has no
+! delete phase -- it never reaches the stamp field at all, whose generated
+! put_slice body is empty -- and when it delegates to a full `ids_put` it
+! returns that routine's status, derived there.
+!
+! Both counters are process-global and not thread-safe. That matches the rest
+! of the generated code, which is already non-reentrant in the same way (the
 ! IDS-level routines declare `integer(ids_int) :: status = 0`, whose initialiser
 ! implies SAVE). The contract is one PUT at a time per process.
 module al_put_policy
@@ -123,6 +155,10 @@ module al_put_policy
   ! record for now, and the printed lines are the whole of the human-readable
   ! one.
   integer, save :: al_refused_write_total = 0
+
+  ! Number of paths the current delete phase refused to remove. Kept apart from
+  ! the count above for the reasons given in the header.
+  integer, save :: al_refused_delete_total = 0
 
 contains
 
@@ -169,5 +205,40 @@ contains
   subroutine al_reset_refused_writes()
     al_refused_write_total = 0
   end subroutine al_reset_refused_writes
+
+  ! Record one path the interposing layer refused to delete.
+  !
+  ! The message says what a refused delete actually costs, which is not what a
+  ! refused write costs: the caller's value is not dropped, the previously
+  ! stored one survives, and the occurrence therefore still holds data this
+  ! operation meant to replace. A reader who saw the write-side wording here
+  ! would look for a value of their own that went missing and find none.
+  !
+  ! Prints for the same reason the write side does: with no structured log yet
+  ! this line is the only place the path is named, so nothing may make it
+  ! optional.
+  subroutine al_note_refused_delete(path, code)
+    character(len=*), intent(in) :: path
+    integer, intent(in) :: code
+
+    al_refused_delete_total = al_refused_delete_total + 1
+    write(*,*) "REFUSED DELETE: '", trim(path), &
+               "' cannot be removed, the stored value remains (status ", code, ")"
+  end subroutine al_note_refused_delete
+
+  ! How many paths the current delete phase refused to remove. Zero means the
+  ! occurrence was cleared of everything the traversal asked to remove.
+  pure integer function al_get_refused_delete_count()
+    al_get_refused_delete_count = al_refused_delete_total
+  end function al_get_refused_delete_count
+
+  ! Called at the start of each ids_delete, so the count describes one delete
+  ! traversal -- including the one ids_put performs before writing, which is
+  ! why ids_put does not reset this itself: doing so where it resets the write
+  ! counter would erase the delete phase's count, that reset being after the
+  ! delete.
+  subroutine al_reset_refused_deletes()
+    al_refused_delete_total = 0
+  end subroutine al_reset_refused_deletes
 
 end module al_put_policy

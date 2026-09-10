@@ -28,6 +28,39 @@ module shim_comparison
   character(len=verdict_len), parameter, public :: VERDICT_DIFF   = 'DIFF'
   character(len=verdict_len), parameter, public :: VERDICT_SHAPE  = 'SHAPE'
 
+  ! Why every public function below opens with a dummy nobody can pass.
+  !
+  ! `only3` and `only4` name *which side* was absent, so a verdict is only as
+  ! trustworthy as the caller's knowledge of which reading it handed over
+  ! first.  That knowledge used to live in a comment.  It did not survive:
+  ! test_shim_structural_rules and test_shim_cocos_rules passed the
+  ! shim-served reading first for every rule they check, so each of their
+  ! served-nothing readings reported `only3` -- "a value on the DD 3 side
+  ! only" -- for a reading whose value was in fact on the DD 4 side.  Pass and
+  ! fail were unaffected, since both labels differ from `same`, so no
+  ! assertion in the suite could notice; the wrong label went on to be
+  ! transcribed into tests/shim/README.md as the account of what the shim did.
+  !
+  ! An argument order that is load-bearing, invisible at the call site, and
+  ! unobservable in the result is not something a comment can protect.  So it
+  ! is no longer an order: this type is private, a caller cannot construct one,
+  ! and every value argument sits behind it -- which makes a positional call a
+  ! type error naming this dummy, and leaves keyword form as the only way to
+  ! call any of these functions.  Every call site therefore spells `oracle=`
+  ! and `converted=`, and a reader checking one no longer has to count
+  ! arguments.
+  !
+  ! What remains uncaught by the compiler is a call that names the sides
+  ! correctly and feeds them the wrong readings.  That is what
+  ! check_verdict_orientation.cmake looks for, registered as
+  ! al-fortran-test-shim-verdict-orientation: with the keyword adjacent to its
+  ! value, `oracle=eq_cross` is a grep away, whereas the positional swap it
+  ! replaced was not expressible as a pattern at all.
+  type :: name_the_sides_t
+    ! Never read.  Present so the type is not empty.
+    integer :: unused = 0
+  end type name_the_sides_t
+
   public :: verdict_real, verdict_integer, verdict_real_vector_with_stated_presence, color_for_verdict
   public :: verdict_real_vector_as_read, verdict_real_matrix_as_read
   public :: presence_verdict
@@ -50,18 +83,22 @@ contains
   ! once.  Returns blank when both sides are present, which is the caller's
   ! signal to go on and judge the values.
   !
-  ! `only4` is a statement about argument order as much as about the data: the
-  ! callers pass the DD 4 oracle first and the shim-served side second, so
-  ! `only4` reads "the oracle has a value and the shim served nothing".
-  function presence_verdict(has_left, has_right) result(verdict)
-    logical, intent(in) :: has_left, has_right
+  ! `only4` and `only3` are statements about *roles*, not about positions:
+  ! `only4` reads "the DD 4 oracle has a value and the shim served nothing",
+  ! `only3` the reverse.  The roles are named by the caller because they
+  ! cannot be recovered from the data -- see name_the_sides_t above for what
+  ! happened while they were merely documented.
+  function presence_verdict(name_the_sides, has_oracle, has_converted) result(verdict)
+    type(name_the_sides_t), intent(in), optional :: name_the_sides
+    logical, intent(in) :: has_oracle, has_converted
     character(len=verdict_len) :: verdict
 
-    if (.not. has_left .and. .not. has_right) then
+    if (present(name_the_sides)) continue
+    if (.not. has_oracle .and. .not. has_converted) then
       verdict = VERDICT_ABSENT
-    else if (.not. has_right) then
+    else if (.not. has_converted) then
       verdict = VERDICT_ONLY4
-    else if (.not. has_left) then
+    else if (.not. has_oracle) then
       verdict = VERDICT_ONLY3
     else
       verdict = ''
@@ -80,16 +117,19 @@ contains
     all_near = .true.
   end function all_near
 
-  function verdict_real(left, right) result(verdict)
-    real(ids_real), intent(in) :: left, right
+  function verdict_real(name_the_sides, oracle, converted) result(verdict)
+    type(name_the_sides_t), intent(in), optional :: name_the_sides
+    real(ids_real), intent(in) :: oracle, converted
     character(len=verdict_len) :: verdict
 
-    verdict = presence_verdict(.not. is_absent_real(left), .not. is_absent_real(right))
+    if (present(name_the_sides)) continue
+    verdict = presence_verdict(has_oracle = .not. is_absent_real(oracle), &
+                               has_converted = .not. is_absent_real(converted))
     if (verdict /= '') return
 
-    if (near(left, right)) then
+    if (near(oracle, converted)) then
       verdict = VERDICT_SAME
-    else if (near(left, -right)) then
+    else if (near(oracle, -converted)) then
       ! A COCOS conversion was expected to yield equal HLI values.  Opposite
       ! signs therefore mean its required flip did not happen.
       verdict = VERDICT_NOFLIP
@@ -98,14 +138,17 @@ contains
     end if
   end function verdict_real
 
-  function verdict_integer(left, right) result(verdict)
-    integer(ids_int), intent(in) :: left, right
+  function verdict_integer(name_the_sides, oracle, converted) result(verdict)
+    type(name_the_sides_t), intent(in), optional :: name_the_sides
+    integer(ids_int), intent(in) :: oracle, converted
     character(len=verdict_len) :: verdict
 
-    verdict = presence_verdict(left /= ids_int_invalid, right /= ids_int_invalid)
+    if (present(name_the_sides)) continue
+    verdict = presence_verdict(has_oracle = oracle /= ids_int_invalid, &
+                               has_converted = converted /= ids_int_invalid)
     if (verdict /= '') return
 
-    if (left == right) then
+    if (oracle == converted) then
       verdict = VERDICT_SAME
     else
       verdict = VERDICT_DIFF
@@ -122,11 +165,15 @@ contains
   ! verdict is `same`.  A rule whose quantity neither side served would pass as
   ! agreement.  Deriving presence here means no call site can claim a presence
   ! it has not checked.
-  function verdict_real_vector_as_read(left, right) result(verdict)
-    real(ids_real), intent(in) :: left(:), right(:)
+  function verdict_real_vector_as_read(name_the_sides, oracle, converted) result(verdict)
+    type(name_the_sides_t), intent(in), optional :: name_the_sides
+    real(ids_real), intent(in) :: oracle(:), converted(:)
     character(len=verdict_len) :: verdict
 
-    verdict = verdict_real_vector_with_stated_presence(size(left) > 0, left, size(right) > 0, right)
+    if (present(name_the_sides)) continue
+    verdict = verdict_real_vector_with_stated_presence( &
+                has_oracle = size(oracle) > 0, oracle = oracle, &
+                has_converted = size(converted) > 0, converted = converted)
   end function verdict_real_vector_as_read
 
   ! A 2-D quantity judged as its flattened elements, presence read off the
@@ -135,11 +182,14 @@ contains
   ! reports SHAPE rather than quietly comparing a different number of points
   ! -- but only the count survives the flatten, so a reshape that preserved it
   ! would not be distinguished.  test_shim_comparison pins both.
-  function verdict_real_matrix_as_read(left, right) result(verdict)
-    real(ids_real), intent(in) :: left(:,:), right(:,:)
+  function verdict_real_matrix_as_read(name_the_sides, oracle, converted) result(verdict)
+    type(name_the_sides_t), intent(in), optional :: name_the_sides
+    real(ids_real), intent(in) :: oracle(:,:), converted(:,:)
     character(len=verdict_len) :: verdict
 
-    verdict = verdict_real_vector_as_read(reshape(left, [size(left)]), reshape(right, [size(right)]))
+    if (present(name_the_sides)) continue
+    verdict = verdict_real_vector_as_read(oracle = reshape(oracle, [size(oracle)]), &
+                                          converted = reshape(converted, [size(converted)]))
   end function verdict_real_matrix_as_read
 
   ! Presence stated by the caller rather than read off the data, which is a
@@ -151,19 +201,22 @@ contains
   ! caller that has checked presence some other way -- from the skip log, say
   ! -- is entitled to say so.  The name is deliberately long enough that a
   ! call site claiming a presence it has not established reads wrong.
-  function verdict_real_vector_with_stated_presence(has_left, left, has_right, right) result(verdict)
-    logical, intent(in) :: has_left, has_right
-    real(ids_real), intent(in) :: left(:), right(:)
+  function verdict_real_vector_with_stated_presence(name_the_sides, has_oracle, oracle, &
+                                                    has_converted, converted) result(verdict)
+    type(name_the_sides_t), intent(in), optional :: name_the_sides
+    logical, intent(in) :: has_oracle, has_converted
+    real(ids_real), intent(in) :: oracle(:), converted(:)
     character(len=verdict_len) :: verdict
 
-    verdict = presence_verdict(has_left, has_right)
+    if (present(name_the_sides)) continue
+    verdict = presence_verdict(has_oracle = has_oracle, has_converted = has_converted)
     if (verdict /= '') return
 
-    if (size(left) /= size(right)) then
+    if (size(oracle) /= size(converted)) then
       verdict = VERDICT_SHAPE
-    else if (all_near(left, right)) then
+    else if (all_near(oracle, converted)) then
       verdict = VERDICT_SAME
-    else if (all_near(left, -right)) then
+    else if (all_near(oracle, -converted)) then
       verdict = VERDICT_NOFLIP
     else
       verdict = VERDICT_DIFF
