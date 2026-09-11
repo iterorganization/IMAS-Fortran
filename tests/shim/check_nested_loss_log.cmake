@@ -81,6 +81,39 @@ set(_expected_records
   "read${_tab}LOSSY${_tab}time_slice/convergence/result/name"
   "read${_tab}LOSSY${_tab}time_slice/convergence/result/index"
   "read${_tab}LOSSY${_tab}time_slice/convergence/result/description"
+  # The three paths below are refusals rather than conversions, and they carry
+  # a different fidelity for that reason rather than by accident.
+  #
+  # Every LOSSY row above comes from a `right_only` rule whose `reverse`
+  # fidelity is `lossy` -- reverse, because a 4.1.1 HLI reading 3.39.0 storage
+  # resolves HLI spellings to stored ones in that direction, which the shim's
+  # known_artifacts.rs states where it picks the artifact.  The three below are
+  # `right_only` too, and `contour_tree/node` shares one single subtree rule
+  # with the `contour_tree/edges` listed above: the map draws no distinction
+  # between them at all.
+  #
+  # Shape does.  All three are `struct_array` in DD 4.1.1 -- the only shape
+  # that needs an arraystruct context open -- and that open is refused, because
+  # a right_only path has no stored counterpart to open.  The shim stamps a
+  # refusal UNMAPPABLE at the seam without consulting the map (issue #178),
+  # since no conversion ran to have a fidelity.  Both verdicts are right; they
+  # answer different questions.
+  #
+  # Expected rather than known defect: the refusals are honest.  None of the
+  # three has a DD 3.39.0 source to serve from, and `j_parallel` in particular
+  # is a different quantity from the `j_phi` that test_shim_structural_rules
+  # serves and passes -- so "unmappable" is the truthful answer here, not a
+  # failure to map.
+  #
+  # What this pins is the *refusal decision*, not the absence of a mapping.  A
+  # shim that returned an empty arraystruct instead of refusing would move or
+  # drop these rows and turn this test red on an improvement -- the inverse of
+  # the hazard the known-defect block below guards against.  A reader who
+  # arrives here from that failure should suspect the decision changed, not
+  # that a mapping regressed.
+  "read${_tab}UNMAPPABLE${_tab}grids_ggd/grid/space/coordinates_type"
+  "read${_tab}UNMAPPABLE${_tab}time_slice/constraints/j_parallel"
+  "read${_tab}UNMAPPABLE${_tab}time_slice/contour_tree/node"
 )
 set(_actual_records)
 foreach(_record IN LISTS _records)
