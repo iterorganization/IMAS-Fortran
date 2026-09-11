@@ -495,8 +495,8 @@ because `ids_routines` uses all 82 delete modules in a single scope.
 
 ## The other half, which is not ours: the stamp is silently overwritten
 
-**This is a shim defect. It needs its own ticket against
-IMAS-Multiversion-DD-Loader; do not chase it here.**
+**This is an IMAS-Core defect, not a shim defect. It is tracked as
+IMAS-Core#63; do not chase it here.**
 
 The delete is refused. The `put_string(..., "4.1.1")` that follows it is *not*.
 Measured against a pristine copy of `imas-python-fixtures/fixtures/dd-3.39.0`:
@@ -510,24 +510,48 @@ only refusal emitted : the delete one, quoted above
 The pulse then advertises DD 4.1.1 while holding DD 3.39.0 data, so every later
 open reads it with no conversion at all and the conversion silently disappears.
 
-The shim already declares the check that should have stopped it. In
-`src/conversion/path_conversion.rs`, `DD_VERSION_STAMP` is
-`ids_properties/version_put/data_dictionary`, `WRITE_CHECKS` contains
-`WriteCheck::ImmutableStamp` (ADR 0016 decision 5), and `write_check_refusal`
-returns *"the DD-version stamp is immutable under a version mismatch"* for
-exactly that path. That refusal never appears. The delete-side twin, reading
-`DD_VERSION_STAMP_ANCESTRY`, *does* fire on the same path in the same
-operation, so the joined DD path is right at the delete seam. That the write
-seam does not run its checks for this path is a **hypothesis**; the three lines
-of measurement above are not.
+### Why -- measured, and not what this section first claimed
+
+An earlier revision of this section guessed that the shim's write seam does not
+run its checks for this path. It said so as a hypothesis, and the hypothesis
+was wrong. Recording the correction matters: acted on, it would have sent
+someone hunting a defect that does not exist.
+
+`WriteCheck::ImmutableStamp` works. Writing the stamp into an *intact* DD 3
+occurrence refuses exactly as ADR 0016 decision 5 requires:
+
+```
+IMAS-MVDD: the DD-version stamp is immutable under a version mismatch
+status = -1000, stamp preserved at 3.39.0
+```
+
+The cause is upstream of the shim entirely. `HDF5Backend::deleteData` accepts a
+`path` and never forwards it, so the *first* delete `ids_put` issues --
+`ids_properties/comment` -- destroys the whole `equilibrium.h5` file. Every
+delete after it, the refused stamp delete included, acts on an occurrence that
+is already gone: the refusal is honest, it simply protects nothing. `ids_put`
+then opens its own context, the stamp probe finds no occurrence, ADR 0007
+presumes the occurrence matches the HLI DD version, and no conversion record is
+armed. Every write is therefore an untranslated forward: the write seam never
+narrows the path, so `ImmutableStamp` is never reached.
+
+Measured both ways, with nothing but the run-time core changed:
+
+| run-time IMAS-Core | `al-fortran-test-shim-full-put-stamp` |
+|---|---|
+| upstream 5.7.2 -- `deleteData` drops its `path` | red, no write refusal |
+| fork with the per-path delete (#63) | **green** |
+
+`IMAS_CORE_LIBRARY` is read at run time, and `AL_CORE_RUNTIME_LIBRARY` sets it
+for the whole suite, so this costs a reconfigure rather than a rebuild.
 
 ## Consequence for the test, stated so nobody reverts a correct fix
 
-`al-fortran-test-shim-full-put-stamp` stays red, and that is correct. Both
-remaining reasons are the shim defect above, not this one.
+`al-fortran-test-shim-full-put-stamp` stayed red after this fix, and that was
+correct. The one remaining reason was the IMAS-Core defect above, not this one.
 
 Worth being precise about, because it is easy to read this fix as the thing
-that turns the test green, and it is not. The scenario was written around the
+that turned the test green, and it is not. The scenario was written around the
 *write* refusal, not the delete: its ctest wrapper asserts
 
 ```
@@ -535,8 +559,8 @@ EXPECTED_OUTPUT=REFUSED WRITE: 'ids_properties/version_put/data_dictionary'
 ```
 
 on the program's output, which is a line only `al_note_refused_write` prints.
-That line never appears, for the same reason the stamp gets overwritten. So the
-scenario failed at two independent places before this fix and still fails at
+That line never appeared, for the same reason the stamp got overwritten. So the
+scenario failed at two independent places before this fix and still failed at
 two after it: the stamp-write assertion, and the final check that the stored
 stamp still reads `3.39.0`.
 
@@ -547,10 +571,10 @@ produces it, so a status assertion on its own would be satisfied by the delete
 refusal while the write refusal the contract demands never happened. The
 program therefore asserts each phase on its own counter --
 `al_get_refused_delete_count()` and `al_get_refused_write_count()` -- and the
-status as the derived summary it is. The delete half is green with this fix;
-the write half is red on the shim.
+status as the derived summary it is.
 
 That is the shape to keep: this fix makes a previously invisible refusal
-visible and pins it with an assertion, and it removes one of the two Fortran
-defects behind the scenario. The scenario turns green by itself once the shim
-stops rewriting the stamp.
+visible and pins it with an assertion, and it removes one of the two defects
+behind the scenario. The scenario turned green by itself once IMAS-Core began
+honouring the `path` argument to `al_delete_data`, exactly as this section
+predicted it would -- though for a reason this section first got wrong.

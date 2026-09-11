@@ -31,44 +31,49 @@ These are the current reds against the shipped shim. Any other red is a
 regression until this table is updated with a reviewed cause.
 
 **Observed, not inferred.** The list below is what
-`ctest --test-dir <shim-build> -L shim` printed on 2026-09-09 against the shim
-at `install-debug`: **4 failures out of 29**. Do not reconstruct it from
+`ctest --test-dir <shim-build> -R shim` printed on 2026-09-11 against the shim
+at `install-debug`: **1 failure out of 30**. Do not reconstruct it from
 tickets or commit messages — reds that emerge from the combination, or from the
 shim changing underneath, appear in no ticket at all. Re-run the suite (it
-takes about 2 seconds) and confirm linkage with `otool` first, or the failures
+takes about 3 seconds) and confirm linkage with `otool` first, or the failures
 describe a build that converted nothing.
 
-All four remaining reds are shim-side. Every red this repository owned has been
-fixed; see "Reds that were this repository's" below. Read that section before
-trusting a cause in this table: one of its rows named the shim for a defect
-that was the suite's own, and two more named the shim correctly but described
-what happened with the labels inverted.
+**Which IMAS-Core is loaded is part of the observation.** The run above used a
+core that honours the `path` argument to `al_delete_data` (IMAS-Core#63),
+supplied through `AL_CORE_RUNTIME_LIBRARY`. Against a core without it — which
+includes upstream 5.7.2 — `full-put-stamp` is red as well, for a reason that
+lives in neither this repository nor the shim. Record the core alongside the
+count, or the table describes a different system than the reader's.
 
 | Test | Observed cause | Verdict printed |
 |---|---|---|
-| `al-fortran-test-shim-structural-rules` | The shim refuses the multi-candidate AOS paths behind `fold-constraints-j`, `fold-ggd-j` and `fold-ggd-bfield` — *"this path is served by several stored candidates, and only a data read can try them in turn"* — so the converted side is absent for all three. **3 rules, not 4:** `fold-axis-bphi` is now served and green. | `only4`, expected `same` |
-| `al-fortran-test-shim-cocos-rules` | Refusing the `constraints/j_phi` merged AOS also leaves its `position/psi` COCOS rule unserved. 1 rule. | `only4`, expected `same` |
-| `al-fortran-test-shim-right-only-rules` | **10 of the 13** DD-4-only rules come back as present, disagreeing readings while the loss file records them as `LOSSY`; the contract requires the converted DD 3 side to be absent. The shim serves a value for a path it has nothing to build one from. | `DIFF`, expected `only4` |
-| `al-fortran-test-shim-full-put-stamp` | The shim refuses the stamp *delete* (contract section 6) but **not** the stamp *write* (section 5), and then stores `4.1.1` over the stored `3.39.0`. Two assertions are red: the missing write refusal, and the overwritten stamp. The pulse is left advertising a DD version it does not hold, so every later open reads it unconverted. | — |
+| `al-fortran-test-shim-nested-loss` | The shim now retains an `Unmappable` loss when an arraystruct open refuses, tagged `Read` (shim issue #178). Three rows the pin does not list therefore appear: `grids_ggd/grid/space/coordinates_type`, `time_slice/constraints/j_parallel` and `time_slice/contour_tree/node`. The shim announced this in its integration contract; the pin in `check_nested_loss_log.cmake` predates it. Whether the three belong in the expected set or in the known-defect block is an open call — see below. | — |
 
-`structural-rules` and `cocos-rules` used to be recorded here as reporting
-`only3`. That was what the suite printed, and it was the wrong label: `only3`
-means "a value on the DD 3 side only", and the absent side in both cases is the
-converted one, which the module's vocabulary calls `only4`. The reds are the
-shim's; the wrong label was in those two programs — see "Which side is which"
-below.
+The three rows are refusals for paths with no DD 3 source, so they read as
+honest rather than defective: `j_parallel` is a different quantity from the
+`j_phi` that `structural-rules` serves and passes. That argues for the expected
+set. One asymmetry is worth settling first, though: `contour_tree/edges` is
+already expected as `LOSSY` while `contour_tree/node` arrives `UNMAPPABLE`.
+Put them in the expected set only once that difference is understood — this
+test deliberately separates "expected" from "known defect" so that it is never
+green on a bug.
+
+`structural-rules`, `cocos-rules` and `right-only-rules` left this table on
+2026-09-11, green against shim #177 and #179 without any change here.
+`full-put-stamp` left it the same day against a fixed IMAS-Core; its entry in
+the next section records what was believed about it, because that belief was
+wrong in an instructive way.
 
 The `al-fortran-test-shim-torn-write` behaviour pin is expected to pass: a
 refused DD-4-only write leaves the already-written fields and widened
-`time_slice` on disk while the traversal continues. `roundtrip-cross-dd` and
-`nested-loss` also pass against the current shim; earlier notes that expected
-them red predate the shim's `chi_squared` fix.
+`time_slice` on disk while the traversal continues. `roundtrip-cross-dd` also
+passes against the current shim.
 
 ## Reds that were this repository's, and are fixed
 
-Three rows left this table on 2026-09-09. Recorded rather than deleted: a red
-list is also a record of what was believed about each red, and one of these
-rows had the owner wrong.
+Three rows left this table on 2026-09-09 and four more on 2026-09-11.
+Recorded rather than deleted: a red list is also a record of what was believed
+about each red, and two of these rows had the owner wrong.
 
 - **`nested-loss` and `refusal-rules`** — both were red because the shim
   refused the four unit-redefined `{x_point,strike_point}/chi_squared_{r,z}`
@@ -94,8 +99,22 @@ rows had the owner wrong.
   refusal never became a partial outcome. That was a defect in this
   repository's generated code, fixed in `IDSDef2F90Routines.xsl`; the
   diagnosis, the four decisions it required and the measured blast radius are
-  in `playground/FINDINGS.md`. What is left red is the write half, which is the
-  shim's.
+  in `playground/FINDINGS.md`. What was left red was the write half — recorded
+  here at the time as the shim's, which turned out to be wrong; see the bullet
+  below.
+
+- **`full-put-stamp`'s write assertion** — recorded here as the shim refusing
+  the stamp *delete* but not the stamp *write*, and the cause guessed at as the
+  shim's write seam not running its checks for that path. **Both halves of that
+  were wrong, and the owner was wrong too.** `WriteCheck::ImmutableStamp`
+  refuses correctly whenever it is reached. It was not being reached: IMAS-Core's
+  `HDF5Backend::deleteData` ignored its `path` argument, so the first delete
+  `ids_put` issues destroyed the whole occurrence. The refused stamp delete was
+  then protecting nothing, the stamp probe that follows found no occurrence,
+  ADR 0007 presumed a match, and no conversion was armed — so every write was an
+  untranslated forward and the write seam never narrowed the path. Fixed in
+  IMAS-Core (#63); the test goes green against a core carrying it, with no change
+  to the shim and none here. The measurements are in `playground/FINDINGS.md`.
 
 ## Which side is which: the suite reported inverted verdict labels
 
